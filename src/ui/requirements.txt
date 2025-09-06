@@ -1,0 +1,4 @@
+flask>=2.3.0s
+requests>=2.28.0
+gradio
+requests

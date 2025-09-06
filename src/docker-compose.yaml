@@ -1,0 +1,44 @@
+services:
+  # Main Emotion API Service (from Docker Hub)
+  emotion-api:
+    image: stevef1uk/emotion-service:amd64
+    ports:
+      - "8000:8000"
+    environment:
+      - MODEL_PATH=/app/model
+      - GO_SERVER_PORT=8000
+    networks:
+      - emotion_network
+    restart: unless-stopped
+
+  # MCP Server
+  emotion-mcp:
+    build:
+      context: ./mcp-go-server
+      dockerfile: Dockerfile
+    ports:
+      - "9000:9000"
+    environment:
+      - EMOTION_SERVICE_URL=http://emotion-api:8000/predict
+      - MCP_SERVER_PORT=9000
+    networks:
+      - emotion_network
+    restart: unless-stopped
+
+  # Gradio UI
+  emotion-ui:
+    build:
+      context: ./ui
+      dockerfile: Dockerfile
+    ports:
+      - "7860:7860"
+    environment:
+      - SG_BASE=http://emotion-mcp:9000
+      - DIRECT_API_BASE=http://emotion-api:8000
+    networks:
+      - emotion_network
+    restart: unless-stopped
+
+networks:
+  emotion_network:
+    driver: bridge
