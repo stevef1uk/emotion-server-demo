@@ -39,6 +39,7 @@ The project structure has been updated to reflect the new Gradio UI setup and th
 │   └── ...
 └── keys/
     └── public_key.pem
+
 Quick Start
 This stack is designed for a fast, hassle-free launch. 🚀
 
@@ -47,6 +48,7 @@ Clone the project or ensure all required files are in place.
 Run the following command from the root directory to build and start all services in detached mode:
 
 Bash
+cd src
 docker-compose up --build -d
 Note: The initial build may take a few minutes as it downloads base images and dependencies.
 
