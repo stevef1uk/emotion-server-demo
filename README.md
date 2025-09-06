@@ -1,215 +1,126 @@
-# Emotion API Stack
+# Emotion Service Stack
 
-A complete Docker Compose setup for the Emotion API service with UI and MCP server.
+A complete Docker Compose setup for the Emotion API service, featuring a **Gradio UI** and an **MCP server** for streamlined experimentation and access.
 
 ## Architecture
 
 The stack consists of three main services:
 
-1. **Emotion API** (`emotion-api`) - Main Go server with llama.cpp integration
-2. **Python UI** (`emotion-ui`) - Python Flask/FastAPI server providing web interface
-3. **MCP Server** (`emotion-mcp`) - Go-based MCP server for external integrations
+* **Emotion API (`emotion-api`)**: The core Go server that runs the emotion analysis model using `llama.cpp` integration. This is the source of truth for emotion predictions. It contains a fine-tuned gemeni3:120 model embedded in a docker container. This componnet is external to this project see: https://hub.docker.com/repository/docker/stevef1uk/emotion-server/general for details.
+* **Gradio UI (`emotion-ui`)**: A user-friendly Gradio-based web interface that allows for easy interaction with the service. It can send prediction requests directly to the `emotion-api` or via the `emotion-mcp` server.
+* **MCP Server (`emotion-mcp`)**: A Go-based server that acts as a proxy, demonstrating the **Model Context Protocol (MCP)** approach. It routes requests from the UI to the Emotion API.
+
+---
 
 ## Prerequisites
 
-- Docker and Docker Compose installed
-- Required files and directories (see Project Structure below)
+* **Docker** and **Docker Compose** installed.
+* The required project files and directories (see Project Structure below).
+
+---
 
 ## Project Structure
 
-```
+The project structure has been updated to reflect the new Gradio UI setup and the location of the `mcp-go-server`.
+
+```bash
 .
 ├── docker-compose.yml
-├── Dockerfile                     # Main emotion API
-├── python_server/
+├── ui/
 │   ├── Dockerfile
-│   ├── requirements.txt
-│   ├── emotion_server.py
 │   └── ...
 ├── mcp-go-server/
 │   ├── Dockerfile
-│   ├── go.mod
-│   ├── go.sum
-│   ├── main/
 │   └── ...
-├── keys/
-│   └── public_key.pem
+├── server/
+│   ├── go.mod
+│   └── ...
 ├── gemma3_emotion_model_unsloth/
-│   └── release/
-│       ├── encrypted_files.zip
-│       └── token.txt
-└── server/                        # Go server source
-    ├── go.mod
-    ├── go.sum
-    └── ...
-```
+│   └── ...
+└── keys/
+    └── public_key.pem
+Quick Start
+This stack is designed for a fast, hassle-free launch. 🚀
 
-## Quick Start
+Clone the project or ensure all required files are in place.
 
-1. **Clone/prepare your project** with all required files
+Run the following command from the root directory to build and start all services in detached mode:
 
-2. **Run the setup script**:
-   ```bash
-   chmod +x setup.sh
-   ./setup.sh
-   ```
+Bash
+docker-compose up --build -d
+Note: The initial build may take a few minutes as it downloads base images and dependencies.
 
-   Or manually:
-   ```bash
-   docker-compose build
-   docker-compose up -d
-   ```
+Access the services:
 
-3. **Wait for services to start** (may take a few minutes for first run)
+Gradio UI: http://localhost:7860
 
-4. **Access the services**:
-   - Emotion API: http://localhost:8000
-   - Python UI: http://localhost:5001
-   - Prediction endpoint: http://localhost:5001/predict
-   - MCP Server: http://localhost:9000
+Emotion API: http://localhost:8000
 
-## Service Details
+MCP Server: http://localhost:9000
 
-### Emotion API (Port 8000, 8080)
-- Main Go server handling emotion analysis
-- Internal llama.cpp server on port 8080
-- Decrypts and loads the ML model on startup
-- Provides REST API endpoints
+Service Details
+Gradio UI (emotion-ui)
 
-### Python UI (Port 5001)
-- Python web server providing user interface
-- Proxies requests to the main Emotion API
-- Provides `/predict` endpoint for external access
-- Environment variable: `EMOTION_API_URL=http://emotion-api:8000`
+Port: 7860
 
-### MCP Server (Port 9000)
-- Go-based MCP (Model Context Protocol) server
-- Connects to Python UI's prediction endpoint
-- Environment variable: `EMOTION_SERVICE_URL=http://emotion-ui:5001/predict`
+Description: The primary user interface for this project. It lets you send text to the Emotion service and see the returned emotion. It's configured to access the services via two different paths:
 
-## Environment Variables
+Direct API: Requests are sent straight to http://emotion-api:8000.
 
-### Emotion API
-- `MODEL_PATH=/app/model`
-- `LLAMA_SERVER_URL=http://127.0.0.1:8080`
-- `LLAMA_SERVER_PORT=8080`
-- `GO_SERVER_PORT=8000`
-- `PUBLIC_KEY_PATH=/app/keys/public_key.pem`
-- `TOKEN_FILE_PATH=/app/gemma3_emotion_model_unsloth/release/token.txt`
-- `ENCRYPTED_ZIP_PATH=/app/gemma3_emotion_model_unsloth/release/encrypted_files.zip`
-- `DECRYPT_OUTPUT_DIR=/app/model`
+MCP Approach: Requests are routed through the http://emotion-mcp:9000 server.
 
-### Python UI
-- `EMOTION_API_URL=http://emotion-api:8000`
+Environment Variables:
 
-### MCP Server
-- `EMOTION_SERVICE_URL=http://emotion-ui:5001/predict`
-- `MCP_SERVER_PORT=9000`
+SG_BASE=http://emotion-mcp:9000
 
-## Management Commands
+DIRECT_API_BASE=http://emotion-api:8000
 
-### Start services
-```bash
-docker-compose up -d
-```
+Emotion API (emotion-api)
 
-### View logs
-```bash
-# All services
-docker-compose logs -f
+Port: 8000
 
-# Specific service
-docker-compose logs -f emotion-api
-docker-compose logs -f emotion-ui
-docker-compose logs -f emotion-mcp
-```
+Description: The core Go server with llama.cpp integration. It handles all emotion analysis logic.
 
-### Stop services
-```bash
-docker-compose down
-```
+Environment Variables:
 
-### Rebuild services
-```bash
-docker-compose build --no-cache
-docker-compose up -d
-```
+MODEL_PATH=/app/model
 
-### Check service status
-```bash
-docker-compose ps
-```
+GO_SERVER_PORT=8000
 
-### Restart a service
-```bash
-docker-compose restart emotion-api
-```
+MCP Server (emotion-mcp)
 
-## Troubleshooting
+Port: 9000
 
-### Services won't start
-1. Check logs: `docker-compose logs -f [service-name]`
-2. Verify all required files exist (see Project Structure)
-3. Ensure ports 5001, 8000, 8080, 9000 are available
-4. Check Docker daemon is running
+Description: A Go server that demonstrates the Model Context Protocol. It acts as a middle layer between the UI and the Emotion API.
 
-### Model decryption fails
-1. Verify `public_key.pem` exists and is valid
-2. Check `token.txt` contains valid decryption token
-3. Ensure `encrypted_files.zip` is present and not corrupted
+Environment Variables:
 
-### Connection issues between services
-1. Services communicate via Docker network `emotion_network`
-2. Check service dependencies in docker-compose.yml
-3. Verify health checks are passing
-4. Use service names (not localhost) for inter-service communication
+EMOTION_SERVICE_URL=http://emotion-api:8000/predict
 
-### Health checks failing
-Services include health checks that verify they're responding correctly:
-- Emotion API: `curl -f http://localhost:8000/health`
-- Python UI: `curl -f http://localhost:5001/health`
-- MCP Server: `curl -f http://localhost:9000/health`
+MCP_SERVER_PORT=9000
 
-Add these endpoints to your applications if they don't exist.
+Management Commands
+Command	Description
+docker-compose up -d	Starts all services in the background.
+docker-compose down	Stops and removes all containers, networks, and volumes.
+docker-compose logs -f	Follows logs for all services.
+docker-compose logs -f <service>	Follows logs for a specific service (e.g., emotion-ui).
+docker-compose ps	Lists all services and their current status.
+docker-compose restart <service>	Restarts a specific service.
+Troubleshooting
+Services won't start? Use docker-compose logs -f to see the error messages.
 
-## Development
+Can't access the UI? Make sure Docker is running and that port 7860 is not being used by another application.
 
-### Local development
-For local development, you can override specific services:
+Model decryption fails? Ensure that following expiry of the evaluation license a valid license is requested from the projects author (stevef1uk@gmail.com) if you wish to continue to use the docker emotion-service container.
 
-```bash
-# Run only emotion-api and emotion-ui, develop MCP locally
-docker-compose up emotion-api emotion-ui
-cd mcp-go-server && go run ./main
-```
+If you have any further questions or issues, feel free to open an issue on the project's repository.
 
-### Updating a service
-```bash
-# Rebuild and restart specific service
-docker-compose build emotion-ui
-docker-compose up -d emotion-ui
-```
+Disclaimers
+For Educational/Experimental Purposes Only: This project is intended for educational and experimental purposes. It is not designed for production use without further security hardening and optimization.
 
-## Security Notes
+No Guarantees: This software is provided "as-is" without any express or implied warranties. The authors and contributors disclaim all liability for any damage or loss resulting from its use.
 
-- Services run as non-root users where possible
-- Only necessary ports are exposed
-- Encrypted model files require proper decryption keys
-- Consider adding authentication for production use
+Third-Party Components: This project utilizes several third-party libraries and components, each with its own license. Please refer to their respective documentation for licensing information.
 
-## Production Deployment
-
-For production deployment:
-
-1. **Use environment-specific compose files**:
-   ```bash
-   docker-compose -f docker-compose.yml -f docker-compose.prod.yml up -d
-   ```
-
-2. **Set up proper secrets management** for keys and tokens
-
-3. **Configure reverse proxy** (nginx/traefik) for SSL termination
-
-4. **Set up monitoring and logging**
-
-5. **Configure backup for model data volume**
+Security: While efforts have been made to secure this setup, it is not a complete production-grade solution. The exposed ports and internal network configurations should be reviewed and secured for any public-facing deployment.
