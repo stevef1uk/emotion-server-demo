@@ -1,145 +1,215 @@
+# Emotion API Stack
 
-# Go MCP Server + Python Emotion API (Demo, CPU-Friendly)
+A complete Docker Compose setup for the Emotion API service with UI and MCP server.
 
-This project demonstrates a clean, practical Model Context Protocol (MCP) server written in Go that calls a lightweight Python Emotion API (Hugging Face). It is designed to show how to expose a single, high-signal MCP tool (`emotion_detection`) to clients like Claude Desktop.
+## Architecture
 
-This is not a fine-tuned-model showcase. Instead, it intentionally uses a compact, off‑the‑shelf model to keep the focus on the integration pattern (Go MCP server ⇄ Python API) and a shareable, CPU‑first developer experience.
+The stack consists of three main services:
 
-## Why this project?
+1. **Emotion API** (`emotion-api`) - Main Go server with llama.cpp integration
+2. **Python UI** (`emotion-ui`) - Python Flask/FastAPI server providing web interface
+3. **MCP Server** (`emotion-mcp`) - Go-based MCP server for external integrations
 
-- Clear demo of MCP integration: a focused tool calling a simple HTTP API
-- CPU‑friendly: small Hugging Face model (~20MB), low latency, no GPU required
-- Minimal surface area: one POST endpoint in Python, one MCP tool in Go
-- Easy to run, easy to extend, easy to share with teams
+## Prerequisites
 
-## What’s inside
+- Docker and Docker Compose installed
+- Required files and directories (see Project Structure below)
 
-- `src/new_mcp_server/python_server/`: Flask API powered by the Hugging Face model `boltuix/bert-emotion` (13 emotions with emoji mapping)
-- `src/new_mcp_server/mcp-go-server/`: Go MCP server that invokes the Python API and formats the result for MCP clients
-- `src/new_mcp_server/docs/`: Task‑focused docs for each component
+## Project Structure
 
-Model reference: `boltuix/bert-emotion` — see model card for details and examples: `https://huggingface.co/boltuix/bert-emotion`
-
-## Quick demo
-
-Input: “I’m so excited about this new release!”
-Output: `Emotion: Happiness 😄 (Confidence: ~98%)`
-
-## Setup (assumes Python is installed)
-
-You’ll run two processes:
-1) Python Emotion API (Hugging Face model)
-2) Go MCP Server (exposes `emotion_detection` to MCP clients)
-
-### 1) Start the Emotion API (Python)
 ```
-cd src/new_mcp_server/python_server
-python3 -m venv ../venv
-source ../venv/bin/activate
-pip install --upgrade pip
-# Install dependencies
-pip install -r requirements.txt
-# (Linux CPU-only alternative for PyTorch)
-# pip install torch --index-url https://download.pytorch.org/whl/cpu
-# pip install -r requirements.txt
-
-python3 emotion_server.py
-# API at: http://127.0.0.1:5001
-# POST /predict {"text": "I am so happy today!"}
+.
+├── docker-compose.yml
+├── Dockerfile                     # Main emotion API
+├── python_server/
+│   ├── Dockerfile
+│   ├── requirements.txt
+│   ├── emotion_server.py
+│   └── ...
+├── mcp-go-server/
+│   ├── Dockerfile
+│   ├── go.mod
+│   ├── go.sum
+│   ├── main/
+│   └── ...
+├── keys/
+│   └── public_key.pem
+├── gemma3_emotion_model_unsloth/
+│   └── release/
+│       ├── encrypted_files.zip
+│       └── token.txt
+└── server/                        # Go server source
+    ├── go.mod
+    ├── go.sum
+    └── ...
 ```
 
-Notes:
-- Python 3.9–3.13 recommended
-- Runs on macOS and Linux without a GPU (pipeline defaults to CPU)
+## Quick Start
 
-### 2) Build and run the MCP Server (Go)
-```
-cd src/new_mcp_server/mcp-go-server
-export PATH=$PATH:/usr/local/go/bin   # if needed
-go version                            # Go 1.21+ recommended
+1. **Clone/prepare your project** with all required files
 
-# Build
-go build -o ./bin/emotion-mcp-server ./main
+2. **Run the setup script**:
+   ```bash
+   chmod +x setup.sh
+   ./setup.sh
+   ```
 
-# (Optional) run via supergateway HTTP bridge – see below
-```
+   Or manually:
+   ```bash
+   docker-compose build
+   docker-compose up -d
+   ```
 
-### Optional: Run via supergateway (HTTP bridge for stdio MCP)
-Prerequisite: Node.js + npm (or corepack). Then:
-```
-# Install once (or use npx each time)
-npm install -g supergateway
+3. **Wait for services to start** (may take a few minutes for first run)
 
-cd src/new_mcp_server/mcp-go-server
-npx -y supergateway \
-  --stdio "./bin/emotion-mcp-server" \
-  --port 8000 \
-  --baseUrl http://localhost:8000
-```
-This exposes the stdio MCP server at `http://localhost:8000` for simple HTTP testing tools.
+4. **Access the services**:
+   - Emotion API: http://localhost:8000
+   - Python UI: http://localhost:5001
+   - Prediction endpoint: http://localhost:5001/predict
+   - MCP Server: http://localhost:9000
 
-#### Installing Node.js and npm
-- Linux (Debian/Ubuntu):
-  - sudo apt update && sudo apt install -y curl
-  - curl -fsSL https://deb.nodesource.com/setup_lts.x | sudo -E bash -
-  - sudo apt install -y nodejs
-- macOS:
-  - Using Homebrew: `brew install node`
-  - Or download installer from the Node.js downloads page (below)
-- Windows:
-  - Download and run the Windows installer from the Node.js downloads page
+## Service Details
 
-Recommended (cross‑platform) via nvm (Node Version Manager):
-```
-curl -fsSL https://raw.githubusercontent.com/nvm-sh/nvm/v0.39.7/install.sh | bash
-# restart your shell
-nvm install --lts && nvm use --lts
-```
+### Emotion API (Port 8000, 8080)
+- Main Go server handling emotion analysis
+- Internal llama.cpp server on port 8080
+- Decrypts and loads the ML model on startup
+- Provides REST API endpoints
 
-References:
-- Node.js downloads: https://nodejs.org/en/download
-- nvm (Node Version Manager): https://github.com/nvm-sh/nvm
+### Python UI (Port 5001)
+- Python web server providing user interface
+- Proxies requests to the main Emotion API
+- Provides `/predict` endpoint for external access
+- Environment variable: `EMOTION_API_URL=http://emotion-api:8000`
 
-### 3) Optional: Use with Claude Desktop
-Add to your Claude Desktop config (path varies by OS):
-```
-{
-  "mcpServers": {
-    "emotion-detection": {
-      "command": "/absolute/path/to/repo/src/new_mcp_server/mcp-go-server/bin/emotion-mcp-server",
-      "env": {
-        "EMOTION_SERVICE_URL": "http://localhost:5001/predict"
-      }
-    }
-  }
-}
-```
-Restart Claude Desktop and request emotion analysis on any text.
+### MCP Server (Port 9000)
+- Go-based MCP (Model Context Protocol) server
+- Connects to Python UI's prediction endpoint
+- Environment variable: `EMOTION_SERVICE_URL=http://emotion-ui:5001/predict`
 
-## Project layout
-```
-repo-root/
-├── README.md                                  # This file (project overview)
-└── src/
-    └── new_mcp_server/
-        ├── python_server/                     # Flask + Hugging Face API
-        │   ├── emotion_server.py
-        │   ├── requirements.txt
-        │   ├── start_server.sh
-        │   └── (docs + tests)
-        ├── mcp-go-server/                     # Go MCP server
-        │   ├── main/
-        │   │   ├── main.go
-        │   │   └── tools.go
-        │   └── bin/
-        └── docs/
-            └── mcp-go-server/
-                ├── INSTRUCTIONS.md
-                └── QUICK_START.md
+## Environment Variables
+
+### Emotion API
+- `MODEL_PATH=/app/model`
+- `LLAMA_SERVER_URL=http://127.0.0.1:8080`
+- `LLAMA_SERVER_PORT=8080`
+- `GO_SERVER_PORT=8000`
+- `PUBLIC_KEY_PATH=/app/keys/public_key.pem`
+- `TOKEN_FILE_PATH=/app/gemma3_emotion_model_unsloth/release/token.txt`
+- `ENCRYPTED_ZIP_PATH=/app/gemma3_emotion_model_unsloth/release/encrypted_files.zip`
+- `DECRYPT_OUTPUT_DIR=/app/model`
+
+### Python UI
+- `EMOTION_API_URL=http://emotion-api:8000`
+
+### MCP Server
+- `EMOTION_SERVICE_URL=http://emotion-ui:5001/predict`
+- `MCP_SERVER_PORT=9000`
+
+## Management Commands
+
+### Start services
+```bash
+docker-compose up -d
 ```
 
-## Support
-- If the Python API won’t start, ensure dependencies are installed and port 5001 is free.
-- If the MCP tool cannot reach the API, set `EMOTION_SERVICE_URL` to the correct base URL.
-- On Linux without GPU, prefer the CPU‑only PyTorch wheel for smaller installs.
-- For HTTP testing, install Node.js/npm to use supergateway (see above).
+### View logs
+```bash
+# All services
+docker-compose logs -f
+
+# Specific service
+docker-compose logs -f emotion-api
+docker-compose logs -f emotion-ui
+docker-compose logs -f emotion-mcp
+```
+
+### Stop services
+```bash
+docker-compose down
+```
+
+### Rebuild services
+```bash
+docker-compose build --no-cache
+docker-compose up -d
+```
+
+### Check service status
+```bash
+docker-compose ps
+```
+
+### Restart a service
+```bash
+docker-compose restart emotion-api
+```
+
+## Troubleshooting
+
+### Services won't start
+1. Check logs: `docker-compose logs -f [service-name]`
+2. Verify all required files exist (see Project Structure)
+3. Ensure ports 5001, 8000, 8080, 9000 are available
+4. Check Docker daemon is running
+
+### Model decryption fails
+1. Verify `public_key.pem` exists and is valid
+2. Check `token.txt` contains valid decryption token
+3. Ensure `encrypted_files.zip` is present and not corrupted
+
+### Connection issues between services
+1. Services communicate via Docker network `emotion_network`
+2. Check service dependencies in docker-compose.yml
+3. Verify health checks are passing
+4. Use service names (not localhost) for inter-service communication
+
+### Health checks failing
+Services include health checks that verify they're responding correctly:
+- Emotion API: `curl -f http://localhost:8000/health`
+- Python UI: `curl -f http://localhost:5001/health`
+- MCP Server: `curl -f http://localhost:9000/health`
+
+Add these endpoints to your applications if they don't exist.
+
+## Development
+
+### Local development
+For local development, you can override specific services:
+
+```bash
+# Run only emotion-api and emotion-ui, develop MCP locally
+docker-compose up emotion-api emotion-ui
+cd mcp-go-server && go run ./main
+```
+
+### Updating a service
+```bash
+# Rebuild and restart specific service
+docker-compose build emotion-ui
+docker-compose up -d emotion-ui
+```
+
+## Security Notes
+
+- Services run as non-root users where possible
+- Only necessary ports are exposed
+- Encrypted model files require proper decryption keys
+- Consider adding authentication for production use
+
+## Production Deployment
+
+For production deployment:
+
+1. **Use environment-specific compose files**:
+   ```bash
+   docker-compose -f docker-compose.yml -f docker-compose.prod.yml up -d
+   ```
+
+2. **Set up proper secrets management** for keys and tokens
+
+3. **Configure reverse proxy** (nginx/traefik) for SSL termination
+
+4. **Set up monitoring and logging**
+
+5. **Configure backup for model data volume**
