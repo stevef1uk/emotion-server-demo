@@ -1,7 +1,7 @@
 services:
   # Main Emotion API Service (from Docker Hub)
   emotion-api:
-    image: stevef1uk/emotion-server:${IMAGE_TAG:-amd64}  # Updated line
+    image: stevef1uk/emotion-service:${IMAGE_TAG:-amd64}  # Updated line
     ports:
       - "8000:8000"
     environment:
