@@ -54,7 +54,9 @@ This stack is designed for a fast, hassle-free launch. 🚀
 2.  Run the following command from the root directory to build and start all services in detached mode:
 
 As the emotion-service docker container has differnet versions for Macs (Apple Silicon) and X86 and RPis a environmnet variable needs to be defined:
-
+```
+cd src
+```
 * For a Mac (ARM64):
     `IMAGE_TAG=arm64 docker-compose up --build -d`
 * For an RPi (ARM):
