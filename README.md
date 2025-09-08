@@ -1,4 +1,4 @@
-### Emotion Service API Testing  Stack
+### Emotion Service Stack
 
 A complete Docker Compose setup for the Emotion API service, featuring a **Gradio UI** and an **MCP server** for streamlined experimentation and access.
 
