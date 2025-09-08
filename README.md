@@ -24,7 +24,7 @@ The stack consists of three main services:
 ### Project Structure
 
 The project structure has been updated to reflect the new Gradio UI setup, the location of the **mcp-go-server**, and the addition of a **tests** directory.
-
+```
 ├── docker-compose.yml
 ├── tests/
 │   ├── request_anger.json
@@ -42,7 +42,7 @@ The project structure has been updated to reflect the new Gradio UI setup, the l
 │   └── ...
 └── keys/
 └── public_key.pem
-
+```
 
 ***
 
@@ -71,6 +71,16 @@ As the emotion-service docker container has differnet versions for Macs (Apple S
 
 ***
 
+** Interacting with the Gradio UI **
+
+The Gradio UI provides a simple, web-based interface for interacting with the emotion service.
+
+Once the Docker containers are running, you can access the UI by navigating to:
+http://localhost:7860
+
+This interface allows you to type text and receive real-time emotion predictions, demonstrating the functionality of the emotion-api and emotion-mcp services.
+
+***
 ### Testing the API with cURL
 
 You can test the **Emotion API** directly from the command line using `curl`. This is useful for quick verification and scripting.
