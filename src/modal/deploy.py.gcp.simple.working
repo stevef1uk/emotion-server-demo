@@ -1,0 +1,118 @@
+import modal
+import subprocess
+import time
+
+app = modal.App("simple-go-test-app")
+
+# GCP secret
+gcp_secret = modal.Secret.from_name("gcp-registry-secret")
+
+# Pull your image from GCP
+go_image = modal.Image.from_gcp_artifact_registry(
+    "europe-west6-docker.pkg.dev/emotion-server-471518/sjf-private/simple-go-app:latest",
+    secret=gcp_secret
+)
+
+@app.function(image=go_image)
+@modal.fastapi_endpoint()  # Updated decorator
+def health():
+    """Health check to diagnose the issue"""
+    try:
+        # Check current directory
+        pwd_result = subprocess.run(["pwd"], capture_output=True, text=True)
+        current_dir = pwd_result.stdout.strip()
+        
+        # List all files in current directory and subdirectories
+        ls_result = subprocess.run(["ls", "-la"], capture_output=True, text=True)
+        file_list = ls_result.stdout
+        
+        # Also check what's in /root and /app
+        root_files = subprocess.run(["ls", "-la", "/root"], capture_output=True, text=True)
+        app_files = subprocess.run(["ls", "-la", "/app"], capture_output=True, text=True)
+        
+        # Find all 'server' files anywhere
+        find_result = subprocess.run(["find", "/", "-name", "server", "-type", "f", "2>/dev/null"], 
+                                   capture_output=True, text=True, shell=True)
+        
+        # Check what your Docker CMD/ENTRYPOINT was
+        # This might give us a clue about where the binary should be
+        
+        return {
+            "status": "diagnostic_complete",
+            "current_directory": current_dir,
+            "current_dir_files": file_list,
+            "root_directory_files": root_files.stdout,
+            "app_directory_files": app_files.stdout,
+            "found_server_binaries": find_result.stdout,
+            "modal_working_dir": current_dir
+        }
+    except Exception as e:
+        return {"status": "error", "message": str(e)}
+
+@app.function(image=go_image)
+@modal.fastapi_endpoint()  # Updated decorator
+def run_go_server():
+    """Start the Go server with better error handling"""
+    try:
+        print("Starting Go server...")
+        
+        # First, let's find where the server binary actually is
+        locations_to_try = ["./server", "/root/server", "/app/server", "server"]
+        server_path = None
+        
+        for location in locations_to_try:
+            check_result = subprocess.run(["ls", "-la", location], capture_output=True, text=True)
+            if check_result.returncode == 0:
+                server_path = location
+                print(f"Found server binary at: {location}")
+                break
+        
+        if not server_path:
+            # If we can't find the binary, let's see what's available
+            ls_result = subprocess.run(["ls", "-la"], capture_output=True, text=True)
+            return {
+                "status": "error",
+                "message": "Server binary not found",
+                "available_files": ls_result.stdout,
+                "working_directory": subprocess.run(["pwd"], capture_output=True, text=True).stdout.strip()
+            }
+        
+        # Make sure it's executable
+        chmod_result = subprocess.run(["chmod", "+x", server_path], capture_output=True, text=True)
+        if chmod_result.returncode != 0:
+            print(f"Warning: Could not make {server_path} executable: {chmod_result.stderr}")
+        
+        # Start the Go server
+        process = subprocess.Popen(
+            [server_path],
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            text=True
+        )
+        
+        # Give it a moment to start
+        time.sleep(2)
+        
+        # Check if it's running
+        if process.poll() is None:
+            return {
+                "status": "Go server started", 
+                "pid": process.pid,
+                "server_path": server_path
+            }
+        else:
+            # If it exited, get the output
+            stdout, stderr = process.communicate()
+            return {
+                "status": "Go server exited", 
+                "returncode": process.returncode,
+                "stdout": stdout,
+                "stderr": stderr,
+                "server_path": server_path
+            }
+    except Exception as e:
+        return {
+            "status": "error",
+            "message": str(e),
+            "type": type(e).__name__
+        }
