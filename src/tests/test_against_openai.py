@@ -18,7 +18,7 @@ import os
 from contextlib import contextmanager
 
 # Default Docker container image
-DEFAULT_CONTAINER_IMAGE = "stevef1uk/emotion-server:amd64"
+DEFAULT_CONTAINER_IMAGE = "stevef1uk/emotion-service:amd64"
 
 @contextmanager
 def run_docker_container(image_name: str, port: int = 8000):
@@ -257,177 +257,52 @@ class EmotionComparison:
             print(f"Error loading Hugging Face dataset: {e}")
             return [], []
 
-    def evaluate_model(self, texts: List[str], true_labels: List[str], 
-                         predictions: List[str], model_name: str) -> Dict:
-        """Evaluate model performance"""
-        valid_indices = [i for i, pred in enumerate(predictions) if pred != "error" and pred in self.emotions]
-        if not valid_indices:
-            return {"error": "No valid predictions"}
+    def evaluate_model(self, texts: List[str], true_labels: List[str],
+                       predictions: List[str], model_name: str) -> Dict:
+        """
+        Evaluate a model's performance and return a dictionary of metrics.
+        """
+        # Remove samples where the model returned an 'error'
+        clean_true_labels = []
+        clean_predictions = []
         
-        filtered_true = [true_labels[i] for i in valid_indices]
-        filtered_pred = [predictions[i] for i in valid_indices]
+        for i in range(len(predictions)):
+            if predictions[i] != 'error':
+                clean_true_labels.append(true_labels[i])
+                clean_predictions.append(predictions[i])
         
-        accuracy = accuracy_score(filtered_true, filtered_pred)
-        
+        # Calculate and print metrics
+        accuracy = accuracy_score(clean_true_labels, clean_predictions) if clean_true_labels else 0
         report = classification_report(
-            filtered_true, 
-            filtered_pred, 
-            labels=list(self.emotions.keys()),
-            target_names=list(self.emotions.keys()),
-            output_dict=True,
+            clean_true_labels, 
+            clean_predictions, 
+            labels=sorted(list(self.emotions.keys())), 
+            output_dict=True, 
             zero_division=0
         )
         
+        print(f"\n--- {model_name} ---")
+        print(classification_report(
+            clean_true_labels, 
+            clean_predictions, 
+            labels=sorted(list(self.emotions.keys())), 
+            zero_division=0
+        ))
+        
         return {
-            "model_name": model_name,
+            "name": model_name,
             "accuracy": accuracy,
-            "total_samples": len(filtered_true),
-            "valid_predictions": len(valid_indices),
-            "classification_report": report
+            "samples": len(clean_true_labels),
+            "report": report,
+            "predictions": clean_predictions,
         }
 
-    def run_comparison(self, run_openai_tests: bool = True, use_hf_dataset: bool = True, hf_sample_size: int = 200):
-        """Run the complete comparison between all three approaches"""
-        
-        print("🚀 Starting Emotion API Comparison...")
-        print("=" * 60)
-        
-        all_texts = []
-        all_labels = []
-        
-        if use_hf_dataset:
-            print(f"📊 Loading {hf_sample_size} samples from Hugging Face dataset...")
-            hf_texts, hf_labels = self.load_huggingface_dataset(hf_sample_size)
-            all_texts.extend(hf_texts)
-            all_labels.extend(hf_labels)
-        
-        print("📝 Adding custom test samples...")
-        for emotion, samples in self.test_samples.items():
-            for sample in samples:
-                all_texts.append(sample)
-                all_labels.append(emotion)
-        
-        print(f"📋 Total test samples: {len(all_texts)}")
-        print(f"📋 Emotion distribution: {dict(pd.Series(all_labels).value_counts())}")
-        
-        # Test your API
-        print("\n🔧 Testing your Emotion API...")
-        your_predictions = []
-        your_confidences = []
-        start_time_your_api = time.time()
-        for i, text in enumerate(all_texts):
-            if i % 50 == 0:
-                print(f"  - Processing sample {i+1}/{len(all_texts)}...")
-            result = self.call_your_api(text)
-            your_predictions.append(result.get("emotion", "error"))
-            your_confidences.append(result.get("confidence", 0))
-        end_time_your_api = time.time()
-        your_time = end_time_your_api - start_time_your_api
-        print(f"✅ Your API tests complete. Total time: {your_time:.2f}s")
-        your_evaluation = self.evaluate_model(all_texts, all_labels, your_predictions, "Your API")
-        
-        # Test Hugging Face model
-        print("\n🤗 Testing Hugging Face Model...")
-        hf_predictions = []
-        hf_confidences = []
-        start_time_hf = time.time()
-        for i, text in enumerate(all_texts):
-            if i % 50 == 0:
-                print(f"  - Processing sample {i+1}/{len(all_texts)}...")
-            result = self.call_hf_model(text)
-            hf_predictions.append(result.get("emotion", "error"))
-            hf_confidences.append(result.get("confidence", 0))
-        end_time_hf = time.time()
-        hf_time = end_time_hf - start_time_hf
-        print(f"✅ Hugging Face model tests complete. Total time: {hf_time:.2f}s")
-        hf_evaluation = self.evaluate_model(all_texts, all_labels, hf_predictions, "Hugging Face")
-
-        # Test OpenAI model (optional)
-        openai_evaluation = None
-        if run_openai_tests:
-            print("\n🤖 Testing OpenAI (ChatGPT) API...")
-            if not self.openai_api_key:
-                print("⚠️ OpenAI API key not provided. Skipping OpenAI tests.")
-            else:
-                openai_predictions = []
-                openai_confidences = []
-                start_time_openai = time.time()
-                for i, text in enumerate(all_texts):
-                    if i % 10 == 0:
-                        print(f"  - Processing sample {i+1}/{len(all_texts)}...")
-                    result = self.call_chatgpt_api(text)
-                    openai_predictions.append(result.get("emotion", "error"))
-                    openai_confidences.append(result.get("confidence", 0))
-                end_time_openai = time.time()
-                openai_time = end_time_openai - start_time_openai
-                print(f"✅ OpenAI API tests complete. Total time: {openai_time:.2f}s")
-                openai_evaluation = self.evaluate_model(all_texts, all_labels, openai_predictions, "OpenAI")
-        else:
-            print("\n⏭️ Skipping OpenAI tests as requested.")
-        
-        # Display and plot results
-        print("\n" + "=" * 60)
-        print("📊 Test Results & Analysis")
-        print("=" * 60)
-        self.print_results(your_evaluation, hf_evaluation, openai_evaluation)
-        self.plot_comparison_chart(your_evaluation, hf_evaluation, openai_evaluation)
-        self.plot_confusion_matrix(all_labels, your_predictions, "Your API Confusion Matrix")
-        self.plot_confusion_matrix(all_labels, hf_predictions, "Hugging Face Confusion Matrix")
-        if openai_evaluation:
-            self.plot_confusion_matrix(all_labels, openai_predictions, "OpenAI Confusion Matrix")
-
-    def print_results(self, your_eval, hf_eval, openai_eval):
-        """Prints the evaluation results in a formatted table."""
-        print(f"| {'Model':<20} | {'Accuracy':<10} | {'Samples':<10} | {'Time (s)':<10} |")
-        print(f"|{'-'*21}|{'-'*12}|{'-'*12}|{'-'*12}|")
-        print(f"| Your API{'':<12} | {your_eval['accuracy']:.4f} | {your_eval['total_samples']:<10} | {your_eval.get('time', 0):<10.2f} |")
-        print(f"| Hugging Face{'':<8} | {hf_eval['accuracy']:.4f} | {hf_eval['total_samples']:<10} | {hf_eval.get('time', 0):<10.2f} |")
-        if openai_eval:
-            print(f"| OpenAI{'':<14} | {openai_eval['accuracy']:.4f} | {openai_eval['total_samples']:<10} | {openai_eval.get('time', 0):<10.2f} |")
-
-        print("\nDetailed Classification Reports:\n")
-        print("--- Your API ---")
-        self.pretty_print_report(your_eval['classification_report'])
-        
-        print("\n--- Hugging Face ---")
-        self.pretty_print_report(hf_eval['classification_report'])
-
-        if openai_eval:
-            print("\n--- OpenAI ---")
-            self.pretty_print_report(openai_eval['classification_report'])
-
-    def pretty_print_report(self, report):
-        """Formats and prints a classification report."""
-        df = pd.DataFrame(report).transpose()
-        df = df.round(2)
-        print(df)
-
-    def plot_comparison_chart(self, your_eval, hf_eval, openai_eval=None):
-        """Generates a bar chart comparing accuracy and F1 scores."""
-        data = {
-            "Model": ["Your API", "Hugging Face"] + (["OpenAI"] if openai_eval else []),
-            "Accuracy": [your_eval['accuracy'], hf_eval['accuracy']] + ([openai_eval['accuracy']] if openai_eval else []),
-            "Macro Avg F1": [
-                your_eval['classification_report']['macro avg']['f1-score'],
-                hf_eval['classification_report']['macro avg']['f1-score']
-            ] + ([openai_eval['classification_report']['macro avg']['f1-score']] if openai_eval else [])
-        }
-        df = pd.DataFrame(data)
-
-        df.set_index('Model', inplace=True)
-        df.plot(kind='bar', figsize=(10, 6), rot=0)
-        plt.title('Emotion Classification Model Performance Comparison')
-        plt.ylabel('Score')
-        plt.ylim(0, 1)
-        plt.legend(loc='lower left')
-        plt.grid(axis='y', linestyle='--')
-        plt.tight_layout()
-        plt.show()
-
-    def plot_confusion_matrix(self, y_true, y_pred, title):
+    def plot_confusion_matrix(self, y_true: List[str], y_pred: List[str], title: str):
         """Generates and displays a confusion matrix."""
+        # --- FIX: Removed the 'zero_division=0' parameter as it's not
+        #          supported by older versions of scikit-learn. ---
         labels = sorted(list(self.emotions.keys()))
-        cm = confusion_matrix(y_true, y_pred, labels=labels, zero_division=0)
+        cm = confusion_matrix(y_true, y_pred, labels=labels)
         
         plt.figure(figsize=(12, 10))
         sns.heatmap(
@@ -444,31 +319,152 @@ class EmotionComparison:
         plt.tight_layout()
         plt.show()
 
+    def print_results(self, all_evaluations: List[Dict]):
+        """Prints a comparison table of all model evaluations."""
+        
+        # Prepare data for the comparison table
+        table_data = []
+        for eval in all_evaluations:
+            table_data.append({
+                "Model": eval['name'],
+                "Accuracy": f"{eval['accuracy']:.4f}",
+                "Samples": eval['samples'],
+                "Time (s)": f"{eval.get('time', 0):.2f}"
+            })
+
+        df = pd.DataFrame(table_data)
+        
+        print("=" * 60)
+        print("📊 Test Results & Analysis".center(60))
+        print("=" * 60)
+        print(df.to_markdown(index=False))
+
+    def run_comparison(self, run_openai_tests: bool = False):
+        """Main function to run the entire comparison process."""
+        print("🚀 Starting Emotion API Comparison...")
+        
+        # Load dataset
+        print("=" * 60)
+        print("📊 Loading 200 samples from Hugging Face dataset...")
+        hf_texts, hf_labels = self.load_huggingface_dataset(sample_size=200)
+
+        # Add custom samples
+        custom_texts = []
+        custom_labels = []
+        for label, texts in self.test_samples.items():
+            custom_texts.extend(texts)
+            custom_labels.extend([label] * len(texts))
+        
+        print("📝 Adding custom test samples...")
+        all_texts = hf_texts + custom_texts
+        all_labels = hf_labels + custom_labels
+        print(f"📋 Total test samples: {len(all_texts)}")
+        
+        # Calculate emotion distribution
+        emotion_counts = defaultdict(int)
+        for label in all_labels:
+            emotion_counts[label] += 1
+        print("📋 Emotion distribution:", dict(emotion_counts))
+        print("-" * 60)
+        
+        all_evaluations = []
+        your_predictions = []
+        hf_predictions = []
+        openai_predictions = []
+
+        # Test Your API
+        print("\n🔧 Testing your Emotion API...")
+        start_time = time.time()
+        for i, text in enumerate(all_texts):
+            if (i + 1) % 50 == 1:
+                print(f" - Processing sample {i + 1}/{len(all_texts)}...")
+            result = self.call_your_api(text)
+            your_predictions.append(result['emotion'])
+        your_time = time.time() - start_time
+        print(f"✅ Your API tests complete. Total time: {your_time:.2f}s")
+        your_evaluation = self.evaluate_model(all_texts, all_labels, your_predictions, "Your API")
+        your_evaluation['time'] = your_time
+        all_evaluations.append(your_evaluation)
+        
+        # Test Hugging Face model
+        print("\n🤗 Testing Hugging Face Model...")
+        start_time = time.time()
+        for i, text in enumerate(all_texts):
+            if (i + 1) % 50 == 1:
+                print(f" - Processing sample {i + 1}/{len(all_texts)}...")
+            result = self.call_hf_model(text)
+            hf_predictions.append(result['emotion'])
+        hf_time = time.time() - start_time
+        print(f"✅ Hugging Face model tests complete. Total time: {hf_time:.2f}s")
+        hf_evaluation = self.evaluate_model(all_texts, all_labels, hf_predictions, "Hugging Face")
+        hf_evaluation['time'] = hf_time
+        all_evaluations.append(hf_evaluation)
+        
+        # Test OpenAI API
+        if run_openai_tests:
+            print("\n🤖 Testing OpenAI (ChatGPT) API...")
+            start_time = time.time()
+            for i, text in enumerate(all_texts):
+                if (i + 1) % 10 == 1:
+                    print(f" - Processing sample {i + 1}/{len(all_texts)}...")
+                result = self.call_chatgpt_api(text)
+                openai_predictions.append(result['emotion'])
+            openai_time = time.time() - start_time
+            print(f"✅ OpenAI API tests complete. Total time: {openai_time:.2f}s")
+            openai_evaluation = self.evaluate_model(all_texts, all_labels, openai_predictions, "OpenAI")
+            # --- FIX: Ensure evaluation dictionary exists before adding time. ---
+            if openai_evaluation:
+                openai_evaluation['time'] = openai_time
+                all_evaluations.append(openai_evaluation)
+
+        # Print final results
+        print("-" * 60)
+        self.print_results(all_evaluations)
+
+        # Plot confusion matrices
+        self.plot_confusion_matrix(all_labels, your_predictions, "Your API Confusion Matrix")
+        self.plot_confusion_matrix(all_labels, hf_predictions, "Hugging Face Confusion Matrix")
+        if run_openai_tests:
+            # --- FIX: Get the correct labels and predictions for the OpenAI plot. ---
+            # Remove samples where the model returned an 'error'
+            openai_true_labels = []
+            openai_clean_predictions = []
+            
+            for i in range(len(openai_predictions)):
+                if openai_predictions[i] != 'error':
+                    openai_true_labels.append(all_labels[i])
+                    openai_clean_predictions.append(openai_predictions[i])
+            self.plot_confusion_matrix(openai_true_labels, openai_clean_predictions, "OpenAI Confusion Matrix")
+
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser(description="Run emotion API comparison tests.")
+    parser = argparse.ArgumentParser(description="Emotion API and Model Comparison Tool")
     parser.add_argument(
-        "--run-openai-tests",
-        action="store_true",
-        help="Flag to run tests against the OpenAI API. Requires OPENAI_API_KEY environment variable."
+        "--openai-key", 
+        type=str, 
+        default=os.getenv("OPENAI_API_KEY"),
+        help="Your OpenAI API key. Defaults to OPENAI_API_KEY environment variable."
+    )
+    parser.add_argument(
+        "--run-openai-tests", 
+        action="store_true", 
+        help="Run tests against the OpenAI API. Requires --openai-key."
     )
     parser.add_argument(
         "--container-name",
         type=str,
         default=DEFAULT_CONTAINER_IMAGE,
-        help=f"Name of the Docker container image to use. Defaults to '{DEFAULT_CONTAINER_IMAGE}'."
+        help="The name of the Docker container image to test against. Defaults to 'stevef1uk/emotion-server:amd64'."
     )
     args = parser.parse_args()
 
-    # Get OpenAI API key from environment variable
-    openai_api_key = os.environ.get("OPENAI_API_KEY")
-    if not openai_api_key and args.run_openai_tests:
-        print("Warning: OPENAI_API_KEY environment variable not found. OpenAI tests will be skipped.")
-        args.run_openai_tests = False
+    # Create an empty list to store the time for each model
+    model_times = {}
 
-    # The main logic to run the comparison
     try:
+        # Use the run_docker_container context manager
         with run_docker_container(args.container_name):
-            tester = EmotionComparison(openai_api_key)
+            tester = EmotionComparison(openai_api_key=args.openai_key)
             tester.run_comparison(run_openai_tests=args.run_openai_tests)
+            
     except RuntimeError as e:
-        print(f"❌ Aborting due to error: {e}")
+        print(f"An error occurred: {e}")
