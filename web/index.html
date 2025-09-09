@@ -1,0 +1,240 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Emotion Server API – Professional Emotion Detection</title>
+  <meta name="description" content="Deploy a secure, local emotion detection API powered by Gemma3. Docker-ready, cross-platform, and licensing-ready for businesses.">
+  <meta name="keywords" content="Emotion API, Emotion Detection, AI Sentiment Analysis, Docker API, SJFisher">
+  <meta name="author" content="SJFisher">
+  <meta name="robots" content="index, follow">
+
+  <meta property="og:title" content="Emotion Server API – Professional Emotion Detection">
+  <meta property="og:description" content="Deploy a secure, local emotion detection API powered by Gemma3. Docker-ready, cross-platform, and licensing-ready for businesses.">
+  <meta property="og:image" content="https://github.com/stevef1uk/emotion-server-demo/raw/master/images/logo.png">
+  <meta property="og:type" content="website">
+  <meta property="og:url" content="https://yourwebsite.com">
+
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:title" content="Emotion Server API – Professional Emotion Detection">
+  <meta name="twitter:description" content="Secure, fast, and local emotion detection API. Ideal for enterprises and startups.">
+  <meta name="twitter:image" content="https://github.com/stevef1uk/emotion-server-demo/raw/master/images/logo.png">
+
+  <script type="application/ld+json">
+  {
+    "@context": "https://schema.org",
+    "@type": "SoftwareApplication",
+    "name": "Emotion Server API",
+    "url": "https://yourwebsite.com",
+    "applicationCategory": "DeveloperApplication",
+    "operatingSystem": "Linux, MacOS, Windows, Raspberry Pi",
+    "offers": {
+      "@type": "Offer",
+      "price": "99.00",
+      "priceCurrency": "EUR",
+      "url": "https://yourwebsite.com/pricing"
+    },
+    "description": "Secure, local emotion detection API using fine-tuned Gemma3 model."
+  }
+  </script>
+
+  <style>
+    body { font-family: Arial, sans-serif; margin:0; padding:0; line-height:1.6; background:#f9fafc; color:#333; }
+    header { background: linear-gradient(to right, #182848, #4b6cb7); color:#fff; padding:40px 20px; text-align:center; }
+    header img { height:80px; margin-bottom:15px; }
+    header h1 { margin:0; font-size:2.5em; }
+    nav a { color:#fff; margin:0 10px; text-decoration:none; font-weight:bold; }
+    .container { max-width:1000px; margin:40px auto; padding:0 20px; }
+    .card { background:#fff; border-radius:8px; padding:25px; margin-bottom:25px; box-shadow:0 4px 6px rgba(0,0,0,0.1); }
+    h2 { color:#182848; margin-top:0; }
+    h3 { color:#333; margin-bottom:5px; }
+    pre { background:#eee; padding:10px; border-radius:5px; overflow-x:auto; }
+    footer { text-align:center; padding:20px; background:#eee; font-size:0.9em; }
+    .pricing-grid { display:grid; grid-template-columns:repeat(auto-fit, minmax(220px, 1fr)); gap:20px; }
+    .price-card { border:1px solid #ddd; border-radius:10px; padding:20px; background:#fafafa; text-align:center; }
+    .price-card h3 { margin:10px 0; }
+    .price-card p { font-size:0.9em; color:#555; }
+    table { border-collapse: collapse; width:100%; margin-top:15px; }
+    table th, table td { border:1px solid #ccc; padding:8px; text-align:center; }
+    table th { background:#f0f0f0; }
+    /* Back-to-top button */
+    #backToTop { position:fixed; bottom:30px; right:30px; display:none; background:#182848; color:#fff; border:none; padding:12px 16px; border-radius:50%; cursor:pointer; box-shadow:0 4px 6px rgba(0,0,0,0.2); font-size:18px; z-index:1000; }
+    #backToTop:hover { background:#4b6cb7; }
+    /* Emotion grid */
+    .emotion-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(120px, 1fr)); gap: 15px; margin-top: 15px; }
+    .emotion-grid div { background: #f0f4f8; padding: 12px; border-radius: 8px; text-align: center; font-size: 1.2em; }
+  </style>
+
+  <script>
+    // Smooth scroll for nav links
+    document.addEventListener("DOMContentLoaded", function() {
+      const links = document.querySelectorAll("nav a");
+      links.forEach(link => {
+        link.addEventListener("click", function(e) {
+          e.preventDefault();
+          const target = document.querySelector(this.getAttribute("href"));
+          target.scrollIntoView({ behavior: "smooth" });
+        });
+      });
+    });
+
+    // Back-to-top button
+    window.addEventListener("scroll", () => {
+      const btn = document.getElementById("backToTop");
+      if (window.scrollY > 300) btn.style.display = "block";
+      else btn.style.display = "none";
+    });
+  </script>
+</head>
+<body>
+  <header>
+    <img src="https://github.com/stevef1uk/emotion-server-demo/raw/master/images/logo.png" alt="Emotion Server API Logo">
+    <h1>Emotion Server API</h1>
+    <p>Professional Emotion Detection for Business and Enterprise</p>
+    <nav>
+      <a href="#features">Features</a>
+      <a href="#emotions">Emotions</a>
+      <a href="#usage">Usage</a>
+      <a href="#benchmarks">Benchmarks</a>
+      <a href="#business-case">Business Case</a>
+      <a href="#pricing">Licensing</a>
+      <a href="#faq">FAQ</a>
+      <a href="#contact">Contact</a>
+    </nav>
+  </header>
+
+  <div class="container">
+    <div class="card" id="features">
+      <h2>Key Features</h2>
+      <p>The Emotion Server API is designed for developers and businesses seeking reliable emotion detection:</p>
+      <ul>
+        <li>🧠 Fine-tuned Gemma3 model for emotion detection (SLM)</li>
+        <li>🐳 Self-contained Docker solution for easy deployment</li>
+        <li>📁 GitHub repository with UI and MCP Server integration</li>
+        <li>📊 Cross-platform support (Mac Apple Silicon, Linux PC, Raspberry Pi)</li>
+        <li>✅ Fast, secure sentiment analysis with no external API calls</li>
+        <li>💡 Integration-ready for agentic solutions</li>
+      </ul>
+    </div>
+
+    <div class="card" id="emotions">
+      <h2>Supported Emotions</h2>
+      <p>The Emotion Server API detects text sentiment across 14 categories, each represented with its emoji:</p>
+      <div class="emotion-grid">
+        <div>😡 <strong>Anger</strong></div>
+        <div>😕 <strong>Confusion</strong></div>
+        <div>🧚 <strong>Desire</strong></div>
+        <div>🤢 <strong>Disgust</strong></div>
+        <div>😨 <strong>Fear</strong></div>
+        <div>😔 <strong>Guilt</strong></div>
+        <div>😊 <strong>Happiness</strong></div>
+        <div>❤️ <strong>Love</strong></div>
+        <div>😐 <strong>Neutral</strong></div>
+        <div>😢 <strong>Sadness</strong></div>
+        <div>🤨 <strong>Sarcasm</strong></div>
+        <div>😳 <strong>Shame</strong></div>
+        <div>😲 <strong>Surprise</strong></div>
+      </div>
+    </div>
+
+    <div class="card" id="usage">
+      <h2>API Usage</h2>
+      <p>You can find the Docker images on the official <a href="https://hub.docker.com/r/stevef1uk/emotion-service">DockerHub page</a>, and the source code on our <a href="https://github.com/stevef1uk/emotion-server-demo">GitHub repository</a>.</p>
+      <p>Deploy via Docker:</p>
+      <pre><code># For Raspberry Pi (32-bit ARM)
+docker pull stevef1uk/emotion-emotion-service:arm
+
+# For Apple Silicon (M1/M2/M3)
+docker pull stevef1uk/emotion-service:arm64
+
+# For standard x86_64 (Linux/Windows)
+docker pull stevef1uk/emotion-service:amd64
+
+# Run the container
+docker run -d -p 8080:8080 stevef1uk/emotion-service:arm64</code></pre>
+
+      <p>Send a POST request:</p>
+      <pre><code>curl -X POST http://localhost:8080/predict \
+     -H "Content-Type: application/json" \
+     -d '{"text": "I’m so happy to see you!"}'
+
+Response:
+{
+  "text": "I’m so happy to see you!",
+  "emotion": "happiness",
+  "emoji": "😊"
+}</code></pre>
+    </div>
+
+    <div class="card" id="benchmarks">
+      <h2>Performance Benchmarks</h2>
+      <p><strong>Accuracy and speed compared across models (226 samples):</strong></p>
+      <table>
+        <tr><th>Model</th><th>Accuracy</th><th>Samples</th><th>Time (s)</th></tr>
+        <tr><td>Fine-Tuned Model (Emotion Server API)</td><td>0.6018</td><td>226</td><td>5.33</td></tr>
+        <tr><td>Hugging Face</td><td>0.3938</td><td>226</td><td>0.48</td></tr>
+        <tr><td>OpenAI</td><td>0.3894</td><td>226</td><td>154.51</td></tr>
+      </table>
+      <p>These results highlight Emotion Server API’s balance of accuracy and efficiency compared to alternatives.</p>
+    </div>
+
+    <div class="card" id="business-case">
+      <h2>Business Case</h2>
+      <p>The Emotion Server API delivers secure, fast, and cost-effective emotion detection for enterprises and startups. Unlike cloud-only solutions, it runs locally within your environment, ensuring sensitive data is never exposed externally. With licensing options for indie developers, startups, and large enterprises, Emotion Server API is flexible and ready to scale with your needs.</p>
+    </div>
+
+    <div class="card" id="pricing">
+      <h2>Licensing Options</h2>
+      <div class="pricing-grid">
+        <div class="price-card">
+          <h3>Developer / Indie</h3>
+          <p>€99 / instance / year</p>
+          <p>For hobbyists and Raspberry Pi projects. Annual renewal required.</p>
+        </div>
+        <div class="price-card">
+          <h3>Startup / Business</h3>
+          <p>€499 / 5 instances / year</p>
+          <p>Ideal for startups and small commercial deployments.</p>
+        </div>
+        <div class="price-card">
+          <h3>Enterprise</h3>
+          <p>€2,499 / year</p>
+          <p>Unlimited instances with access to critical updates and fixes.</p>
+        </div>
+        <div class="price-card">
+          <h3>OEM Licence</h3>
+          <p>Contact us</p>
+          <p>Custom licensing for OEM integrations. Terms available upon request.</p>
+        </div>
+        <div class="price-card">
+          <h3>Software Licence</h3>
+          <p>€10,000 one-off</p>
+          <p>Permanent, royalty-free license with source code access.</p>
+        </div>
+      </div>
+    </div>
+
+    <div class="card" id="faq">
+      <h2>Frequently Asked Questions</h2>
+      <ul>
+        <li><h3>Does Emotion Server API require an internet connection?</h3> No, it runs entirely locally with Docker.</li>
+        <li><h3>Can I use it for commercial purposes?</h3> Yes, licensing options are available for startups and enterprises.</li>
+        <li><h3>Which platforms are supported?</h3> Mac (Apple Silicon), Linux, Windows (via Docker), and Raspberry Pi.</li>
+        <li><h3>Can I integrate this into existing software?</h3> Absolutely — API endpoints are standard RESTful JSON.</li>
+        <li><h3>Do you offer an evaluation license?</h3>  Yes the docker container available today are licensed until the end of 2025</li>
+      </ul>
+    </div>
+
+    <div class="card" id="contact">
+      <h2>Contact & Support</h2>
+      <p>For licensing inquiries, support, or technical assistance, please email <a href="mailto:stevef1uk@gmail.com">stevef1uk@gmail.com</a>. More details can also be found on the <a href="https://github.com/stevef1uk/emotion-server-demo">GitHub repository</a>.</p>
+    </div>
+  </div>
+
+  <button id="backToTop" onclick="window.scrollTo({top: 0, behavior: 'smooth'})">↑</button>
+
+  <footer>
+    <p>&copy; 2025 SJFisher. All rights reserved. | Licensed software product | VAT: FR05902395201</p>
+  </footer>
+</body>
+</html>
