@@ -29,22 +29,14 @@ The stack consists of three main services:
 The project structure has been updated to reflect the new Gradio UI setup, the location of the **mcp-go-server**, and the addition of a **tests** directory.
 ```
 ├── docker-compose.yml
+├── src/
+│   └── all source file
 ├── tests/
 │   ├── request_anger.json
 │   └── request_happy.json
-├── ui/
-│   ├── Dockerfile
-│   └── ...
-├── mcp-go-server/
-│   ├── Dockerfile
-│   └── ...
-├── server/
-│   ├── go.mod
-│   └── ...
-├── gemma3_emotion_model_unsloth/
-│   └── ...
-└── keys/
-└── public_key.pem
+├── token_renewal
+│   └── token_renewal/build-updated-image.sh
+│   └── Dockerfile
 ```
 
 ***
