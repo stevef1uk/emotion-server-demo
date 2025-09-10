@@ -1,4 +1,4 @@
-# Date: 10/09/2025 - Testd Against Model genrated on same day 
+# Date: 10/09/2025 - Tested Against Model generated on same day 
 ---
 # Emotion and Sentiment Model Analysis: Final Report
 
