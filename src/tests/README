@@ -1,0 +1,11 @@
+To build on a Mac it is necessary to:
+
+1. brew install llvm
+2. To use the bundled libc++ please use the following LDFLAGS:
+  export LDFLAGS="-L/opt/homebrew/opt/llvm/lib/c++ -L/opt/homebrew/opt/llvm/lib/unwind -lunwind"
+
+3. 'export PATH="/opt/homebrew/opt/llvm/bin:$PATH"
+
+4. python -m venv .venv
+5. source .venv/bin/activate
+6. pip install -r requirements.txt
