@@ -189,7 +189,7 @@ This command stops and removes all containers, networks, and volumes created by 
 
 ### Troubleshooting
 
-* **Services won't start?** Use `docker-compose logs -f` to see the error messages.
+* **Services won't start?** Use `docker-compose logs -f` to see the error messages. Also can add DEBUG=1 to docker-compose.yml or docker run
 * **Can't access the UI?** Make sure Docker is running and that port 7860 is not being used by another application.
 * **Model decryption fails?** Ensure that following expiry of the evaluation license a valid license is requested from the projects author (stevef1uk@gmail.com) if you wish to continue to use the docker emotion-service container.
 
