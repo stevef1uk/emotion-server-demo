@@ -2,6 +2,7 @@
 
 A complete Docker Compose setup for the Emotion API service, featuring a **Gradio UI** and an **MCP server** for streamlined experimentation and access.
 
+![The UI]([https://raw.githubusercontent.com/stevef1uk/emotion-server-demo/master/images/logo.png](https://github.com/stevef1uk/emotion-server-demo/blob/master/images/ui.png)
 ***
 
 ### Architecture
