@@ -7,3 +7,7 @@ On receipt of the token place it in this directory and run the script:
 ```bash
 python  build-updated-image.sh
 ```
+
+That will create a new docker image called: emotion-service-updated:latest
+
+This will be the image that will now run
