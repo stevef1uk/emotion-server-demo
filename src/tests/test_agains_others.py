@@ -1,4 +1,5 @@
 import json
+from pickle import FALSE
 import requests
 import openai
 import pandas as pd
@@ -16,9 +17,27 @@ import argparse
 import subprocess
 import os
 from contextlib import contextmanager
+from prettytable import PrettyTable
 
 # Default Docker container image
 DEFAULT_CONTAINER_IMAGE = "stevef1uk/emotion-service:amd64"
+
+# Add this utility function to your class or at the top of your file
+def retry_with_backoff(func, retries=5, backoff_factor=1, status_codes=(429, 500, 503)):
+    for i in range(retries):
+        try:
+            response = func()
+            response.raise_for_status()
+            return response
+        except requests.exceptions.HTTPError as e:
+            if e.response.status_code not in status_codes:
+                raise e
+            wait_time = backoff_factor * (2 ** i)
+            print(f"Retrying in {wait_time:.2f} seconds...")
+            time.sleep(wait_time)
+            
+    return None # Returns None if all retries fail
+
 
 @contextmanager
 def run_docker_container(image_name: str, port: int = 8000):
@@ -77,18 +96,27 @@ def run_docker_container(image_name: str, port: int = 8000):
 
 
 class EmotionComparison:
-    def __init__(self, openai_api_key: str, your_api_url: str = "http://localhost:8000/predict"):
+    def __init__(self, openai_api_key: str, your_api_url: str = "http://localhost:8000/predict",
+                 azure_api_key: str = None, azure_url: str = "https://sentiment-server.cognitiveservices.azure.com/text/analytics/v3.1/sentiment",
+                 debug: bool = False):
         """
         Initialize the emotion comparison tool
         
         Args:
             openai_api_key: Your OpenAI API key
             your_api_url: URL of your emotion API service
+            azure_api_key: Azure subscription key for sentiment analysis
+            azure_url: Azure sentiment analysis endpoint URL
+            debug: debug flag
         """
         self.openai_api_key = openai_api_key
         self.your_api_url = your_api_url
-        
-        self.client = openai.OpenAI(api_key=openai_api_key)
+        self.azure_api_key = azure_api_key
+        self.azure_url = azure_url or "https://sentiment-server.cognitiveservices.azure.com/text/analytics/v3.1/sentiment"
+        self.debug = debug
+
+        if openai_api_key:
+            self.client = openai.OpenAI(api_key=openai_api_key)
         
         # Emotion mapping
         self.emotions = {
@@ -96,6 +124,13 @@ class EmotionComparison:
             'fear': '😨', 'guilt': '😔', 'happiness': '😊', 'love': '❤️',
             'neutral': '😐', 'sadness': '😢', 'sarcasm': '🤨', 'shame': '😳',
             'surprise': '😲'
+        }
+        
+        # Map Azure sentiment to emotion categories
+        self.azure_sentiment_map = {
+            'positive': 'happiness',
+            'negative': 'sadness', 
+            'neutral': 'neutral'
         }
         
         # Map Hugging Face model labels to our standard labels
@@ -116,7 +151,74 @@ class EmotionComparison:
             return_all_scores=False
         )
         print("✅ Hugging Face model loaded.")
-        
+   
+
+    def call_azure_sentiment(self, text: str) -> Dict:
+        """Call Azure Text Analytics sentiment API"""
+        try:
+            if not self.azure_api_key:
+                return {"emotion": "error", "confidence": 0, "message": "Azure API key not provided."}
+
+            headers = {
+                "Content-Type": "application/json",
+                "Ocp-Apim-Subscription-Key": self.azure_api_key
+            }
+            
+            data = {
+                "documents": [
+                    {
+                        "id": "1",
+                        "language": "en", 
+                        "text": text
+                    }
+                ]
+            }
+            
+            if self.debug: # ⬅️ Start debug block
+                print("--- Azure API Debug ---")
+                print(f"Request URL: {self.azure_url}")
+                print(f"Request Headers: {json.dumps(headers, indent=2)}")
+                print(f"Request Body: {json.dumps(data, indent=2)}")
+                print("-----------------------")
+
+            def make_request():
+                return requests.post(
+                    self.azure_url,
+                    json=data,
+                    headers=headers,
+                    timeout=30
+                )
+            
+            # Use the retry utility to make the request
+            response = retry_with_backoff(make_request, retries=5)
+            
+            response.raise_for_status()
+            
+            result = response.json()
+            
+            # The JSON response has a 'documents' key which is a list.
+            # We are only sending one document, so we access the first element.
+            if "documents" in result and len(result["documents"]) > 0:
+                doc = result["documents"][0]
+                sentiment = doc["sentiment"]
+                confidence_scores = doc.get("confidenceScores", {})
+                
+                # Find the highest confidence score to use for the result
+                max_confidence = max(confidence_scores.values()) if confidence_scores else 0.5
+                
+                # Map Azure's 'positive', 'negative', 'neutral' to our emotions
+                mapped_emotion = self.azure_sentiment_map.get(sentiment, "neutral")
+                
+                return {"emotion": mapped_emotion, "confidence": max_confidence}
+            else:
+                # Handle cases where no documents are returned
+                return {"emotion": "neutral", "confidence": 0.5}
+                
+        except Exception as e:
+            print(f"Error calling Azure API: {e}")
+            return {"emotion": "error", "confidence": 0, "message": str(e)}
+
+
     def _generate_test_samples(self) -> Dict[str, List[str]]:
         """Generate realistic, non-obvious text samples for each emotion category"""
         
@@ -178,6 +280,64 @@ class EmotionComparison:
         
         return samples
 
+
+    def call_azure_sentiment(self, text: str) -> Dict:
+        """Call Azure Text Analytics sentiment API with retry logic and map the result to an emotion."""
+        if not self.azure_api_key:
+            return {"emotion": "error", "confidence": 0, "message": "Azure API key not provided."}
+
+        headers = {
+            "Content-Type": "application/json",
+            "Ocp-Apim-Subscription-Key": self.azure_api_key
+        }
+        
+        data = {
+            "documents": [
+                {
+                    "id": "1",
+                    "language": "en", 
+                    "text": text
+                }
+            ]
+        }
+        
+        # ⬅️ Wrap the API call in a local function to be used by the retry utility
+        def make_request():
+            return requests.post(
+                self.azure_url,
+                json=data,
+                headers=headers,
+                timeout=30
+            )
+
+        # ⬅️ Use the retry utility to make the call
+        response = retry_with_backoff(make_request, retries=5)
+        
+        # ⬅️ Handle the case where the API call failed after all retries
+        if response is None:
+            return {"emotion": "error", "confidence": 0, "message": "Max retries exceeded for Azure API."}
+
+        # ⬅️ Continue with your existing response processing now that the call was successful
+        try:
+            result = response.json()
+            
+            if "documents" in result and len(result["documents"]) > 0:
+                doc = result["documents"][0]
+                sentiment = doc["sentiment"]
+                confidence_scores = doc.get("confidenceScores", {})
+                
+                max_confidence = max(confidence_scores.values()) if confidence_scores else 0.5
+                mapped_emotion = self.azure_sentiment_map.get(sentiment, "neutral")
+                
+                return {"emotion": mapped_emotion, "confidence": max_confidence}
+            else:
+                return {"emotion": "neutral", "confidence": 0.5}
+        
+        except Exception as e:
+            # This catch block will handle parsing errors or other unexpected exceptions
+            print(f"Error processing Azure API response: {e}")
+            return {"emotion": "error", "confidence": 0, "message": str(e)}
+
     def call_your_api(self, text: str) -> Dict:
         """Call your emotion API service"""
         try:
@@ -228,16 +388,22 @@ class EmotionComparison:
     def call_hf_model(self, text: str) -> Dict:
         """Call a pre-trained Hugging Face model for emotion classification."""
         try:
-            result = self.hf_classifier(text)
-            
-            if result and isinstance(result[0], dict):
-                label = result[0]['label']
-                score = result[0]['score']
+            prediction = self.hf_classifier(text)
+       
+            # The pipeline returns a list of dictionaries, we want the first one
+            # The 'label' is the predicted emotion, and 'score' is the confidence
+            if prediction and isinstance(prediction, list) and len(prediction) > 0:
+                result = prediction[0]
+                predicted_label = result['label'].lower()
+                confidence_score = result['score']
+                
+                # Map HF labels to our standard labels
+                mapped_emotion = self.hf_emotion_map.get(predicted_label, 'neutral')
+                
+                return {"emotion": mapped_emotion, "confidence": confidence_score}
+            else:
+                return {"emotion": "neutral", "confidence": 0.5}
 
-                # Map the Hugging Face model's label to our label set
-                mapped_label = self.hf_emotion_map.get(label, 'unknown')
-
-                return {"emotion": mapped_label, "confidence": score}
             
         except Exception as e:
             print(f"Error calling Hugging Face model: {e}")
@@ -256,6 +422,22 @@ class EmotionComparison:
         except Exception as e:
             print(f"Error loading Hugging Face dataset: {e}")
             return [], []
+
+    # Needed for Mapping Limited Azure emotions to Ours
+    def map_emotion_to_sentiment(self, emotion: str) -> str:
+            """Maps a detailed emotion to one of Azure's sentiment categories."""
+            positive_emotions = {"happiness", "love", "surprise"}
+            negative_emotions = {"anger", "disgust", "fear", "guilt", "sadness", "shame", "sarcasm", "confusion"}
+            
+            if emotion in positive_emotions:
+                return "positive"
+            elif emotion in negative_emotions:
+                return "negative"
+            else: # Covers "neutral" and any other unmapped emotions
+                return "neutral"
+
+
+
 
     def evaluate_model(self, texts: List[str], true_labels: List[str],
                        predictions: List[str], model_name: str) -> Dict:
@@ -339,14 +521,17 @@ class EmotionComparison:
         print("=" * 60)
         print(df.to_markdown(index=False))
 
-    def run_comparison(self, run_openai_tests: bool = False):
+    def run_comparison(self, run_openai_tests: bool = False, run_azure_tests: bool = False, num_samples_per_emotion: int = -1):
         """Main function to run the entire comparison process."""
         print("🚀 Starting Emotion API Comparison...")
         
         # Load dataset
         print("=" * 60)
         print("📊 Loading 200 samples from Hugging Face dataset...")
-        hf_texts, hf_labels = self.load_huggingface_dataset(sample_size=200)
+        if num_samples_per_emotion == -1:
+            hf_texts, hf_labels = self.load_huggingface_dataset(sample_size=200)
+        else:
+            hf_texts, hf_labels = self.load_huggingface_dataset(num_samples_per_emotion)
 
         # Add custom samples
         custom_texts = []
@@ -368,9 +553,57 @@ class EmotionComparison:
         print("-" * 60)
         
         all_evaluations = []
+        azure_predictions = []
         your_predictions = []
         hf_predictions = []
         openai_predictions = []
+
+
+        if run_azure_tests:
+            print("\n🔧 Testing Azure Language API...")
+            start_time = time.time()
+            
+            azure_predictions = []
+            azure_true_labels_for_mapping = []
+
+            # This assumes your all_labels list is aligned with all_texts
+            for i, text in enumerate(all_texts):
+                if (i + 1) % 50 == 1:
+                    print(f" - Processing sample {i + 1}/{len(all_texts)}...")
+                
+                # Use the retry logic
+                result = self.call_azure_sentiment(text)
+                
+                azure_predictions.append(result['emotion'])
+                
+                # Map the true label for the fair comparison later
+                true_label = all_labels[i]
+                remapped_label = self.map_emotion_to_sentiment(true_label)
+                azure_true_labels_for_mapping.append(remapped_label)
+
+            your_time = time.time() - start_time
+            print(f"✅ Azure API tests complete. Total time: {your_time:.2f}s")
+            
+            # Standard Evaluation vs all 13 emotions
+            print("\n--- Azure API Evaluation (vs all emotions) ---")
+            azure_evaluation = self.evaluate_model(all_texts, all_labels, azure_predictions, "Azure API")
+            if azure_evaluation:
+                azure_evaluation['time'] = your_time
+                all_evaluations.append(azure_evaluation)
+
+
+            # Fair Evaluation vs 3 sentiment categories
+            print("\n--- Azure API Evaluation (vs 3 sentiment categories) ---")
+            
+            # Define the labels for the report
+            sentiment_labels = ["positive", "negative", "neutral"]
+            
+            # Map both the true labels and the predictions
+            remapped_true_labels = [self.map_emotion_to_sentiment(label) for label in all_labels]
+            remapped_predictions = [self.map_emotion_to_sentiment(pred) for pred in azure_predictions]
+            
+            # Re-generate the classification report with the remapped labels and correct target names
+            print(classification_report(remapped_true_labels, remapped_predictions, labels=sentiment_labels, zero_division=0))
 
         # Test Your API
         print("\n🔧 Testing your Emotion API...")
@@ -385,6 +618,20 @@ class EmotionComparison:
         your_evaluation = self.evaluate_model(all_texts, all_labels, your_predictions, "Your API")
         your_evaluation['time'] = your_time
         all_evaluations.append(your_evaluation)
+
+
+        # Fair Evaluation (Your API vs 3 sentiment categories)
+        print("\n--- Your API Evaluation (vs 3 sentiment categories) ---")
+        
+        # Define the labels for the report
+        sentiment_labels = ["positive", "negative", "neutral"]
+
+        # Map both the true labels and your API's predictions to the 3 sentiment categories
+        remapped_true_labels = [self.map_emotion_to_sentiment(label) for label in all_labels]
+        remapped_predictions = [self.map_emotion_to_sentiment(pred) for pred in your_predictions]
+        
+        # Generate the classification report with the remapped labels
+        print(classification_report(remapped_true_labels, remapped_predictions, labels=sentiment_labels, zero_division=0))
         
         # Test Hugging Face model
         print("\n🤗 Testing Hugging Face Model...")
@@ -399,6 +646,20 @@ class EmotionComparison:
         hf_evaluation = self.evaluate_model(all_texts, all_labels, hf_predictions, "Hugging Face")
         hf_evaluation['time'] = hf_time
         all_evaluations.append(hf_evaluation)
+
+        # Fair Evaluation (Your API vs 3 sentiment categories)
+        print("\n--- Hugging Face (vs 3 sentiment categories) ---")
+        
+        # Define the labels for the report
+        sentiment_labels = ["positive", "negative", "neutral"]
+
+        # Map both the true labels and your API's predictions to the 3 sentiment categories
+        remapped_true_labels = [self.map_emotion_to_sentiment(label) for label in all_labels]
+        remapped_predictions = [self.map_emotion_to_sentiment(pred) for pred in hf_predictions]
+        
+        # Generate the classification report with the remapped labels
+        print(classification_report(remapped_true_labels, remapped_predictions, labels=sentiment_labels, zero_division=0))
+        
         
         # Test OpenAI API
         if run_openai_tests:
@@ -417,6 +678,20 @@ class EmotionComparison:
                 openai_evaluation['time'] = openai_time
                 all_evaluations.append(openai_evaluation)
 
+            # Fair Evaluation (Your API vs 3 sentiment categories)
+            print("\n--- OpenAI  (vs 3 sentiment categories) ---")
+            
+            # Define the labels for the report
+            sentiment_labels = ["positive", "negative", "neutral"]
+
+            # Map both the true labels and your API's predictions to the 3 sentiment categories
+            remapped_true_labels = [self.map_emotion_to_sentiment(label) for label in all_labels]
+            remapped_predictions = [self.map_emotion_to_sentiment(pred) for pred in openai_predictions]
+            
+            # Generate the classification report with the remapped labels
+            print(classification_report(remapped_true_labels, remapped_predictions, labels=sentiment_labels, zero_division=0))
+            
+
         # Print final results
         print("-" * 60)
         self.print_results(all_evaluations)
@@ -424,6 +699,21 @@ class EmotionComparison:
         # Plot confusion matrices
         self.plot_confusion_matrix(all_labels, your_predictions, "Your API Confusion Matrix")
         self.plot_confusion_matrix(all_labels, hf_predictions, "Hugging Face Confusion Matrix")
+        
+        
+        if run_azure_tests:
+            # --- FIX: Get the correct labels and predictions for the OpenAI plot. ---
+            # Remove samples where the model returned an 'error'
+            azure_true_labels = []
+            azure_clean_predictions = []
+            
+            for i in range(len(azure_predictions)):
+                if azure_predictions[i] != 'error':
+                    azure_true_labels.append(all_labels[i])
+                    azure_clean_predictions.append(azure_predictions[i])
+            self.plot_confusion_matrix(azure_true_labels, azure_clean_predictions, "Azure Language Confusion Matrix")
+
+        
         if run_openai_tests:
             # --- FIX: Get the correct labels and predictions for the OpenAI plot. ---
             # Remove samples where the model returned an 'error'
@@ -444,6 +734,15 @@ if __name__ == "__main__":
         default=os.getenv("OPENAI_API_KEY"),
         help="Your OpenAI API key. Defaults to OPENAI_API_KEY environment variable."
     )
+
+    parser.add_argument("--azure_api_key", type=str, default=os.getenv("AZURE_API_KEY"),
+                        help="Your Azure API key. Defaults to AZURE_API_KEY environment variable.")
+    parser.add_argument("--azure_url", type=str, default=os.getenv("AZURE_URL"),
+                        help="Your Azure Text Analytics endpoint URL. Defaults to AZURE_URL environment variable.")
+    parser.add_argument("--run_azure", action="store_true",
+                        help="Set to True to run Azure Text Analytics endpoint URL. Defaults to False")
+    
+
     parser.add_argument(
         "--run-openai-tests", 
         action="store_true", 
@@ -455,6 +754,13 @@ if __name__ == "__main__":
         default=DEFAULT_CONTAINER_IMAGE,
         help="The name of the Docker container image to test against. Defaults to 'stevef1uk/emotion-server:amd64'."
     )
+
+    parser.add_argument("--num_samples", type=int, default=-1,
+                        help="Number of samples to test for each emotion. Defaults to -1 (all samples).")
+
+    parser.add_argument("--debug", action="store_true",
+                        help="Enable verbose debug logging for API calls.")
+
     args = parser.parse_args()
 
     # Create an empty list to store the time for each model
@@ -463,8 +769,13 @@ if __name__ == "__main__":
     try:
         # Use the run_docker_container context manager
         with run_docker_container(args.container_name):
-            tester = EmotionComparison(openai_api_key=args.openai_key)
-            tester.run_comparison(run_openai_tests=args.run_openai_tests)
+            # Initialize the tester
+            tester = EmotionComparison(
+                        openai_api_key=args.openai_key,  # Use an underscore
+                        azure_api_key=args.azure_api_key,
+                        azure_url=args.azure_url
+                    )
+            tester.run_comparison(run_openai_tests=args.run_openai_tests, run_azure_tests =args.run_azure, num_samples_per_emotion=args.num_samples )
             
     except RuntimeError as e:
         print(f"An error occurred: {e}")
