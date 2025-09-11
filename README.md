@@ -54,6 +54,8 @@ cd src
 ```
 * For a Mac (ARM64):
     `IMAGE_TAG=arm64 docker-compose up --build -d`
+* For a Mac (Intel):
+    `IMAGE_TAG=mac_amd64 docker-compose up --build -d`
 * For an RPi (ARM):
     `IMAGE_TAG=arm docker-compose up --build -d`
 * For an Intel machine (AMD64):
