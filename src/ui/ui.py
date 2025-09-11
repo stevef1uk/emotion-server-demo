@@ -8,6 +8,10 @@ import urllib.parse
 import threading
 from queue import Queue, Empty
 import re
+import asyncio
+import statistics
+from concurrent.futures import ThreadPoolExecutor, as_completed
+from datetime import datetime
 
 # Force immediate output
 sys.stdout.reconfigure(line_buffering=True)
@@ -212,6 +216,158 @@ def _call_direct_api(text: str) -> tuple[int, str]:
     except Exception as e:
         return 0, str(e)
 
+# Performance testing functions
+def _call_direct_api_perf(text: str) -> tuple[float, int, str]:
+    """Sends a request to the direct API endpoint for performance testing. Returns (response_time, status_code, response_text)."""
+    direct_api_url = f"{DIRECT_API_BASE}/predict"
+    payload = {"text": text}
+    
+    start_time = time.time()
+    try:
+        r = requests.post(direct_api_url, json=payload, timeout=30)
+        response_time = time.time() - start_time
+        return response_time, r.status_code, r.text
+    except Exception as e:
+        response_time = time.time() - start_time
+        return response_time, 0, str(e)
+
+def _call_mcp_api_perf(text: str) -> tuple[float, int, str]:
+    """Sends a request to the MCP API for performance testing. Returns (response_time, status_code, response_text)."""
+    if not session_id_event.is_set():
+        return 0.0, 0, "No active MCP session"
+    
+    session_id = session_id_container.get('id')
+    if not session_id:
+        return 0.0, 0, "No session ID available"
+    
+    message_url = f"{MCP_BASE}/message?sessionId={urllib.parse.quote_plus(session_id)}"
+    payload = {
+        "jsonrpc": "2.0",
+        "id": 1,
+        "method": "tools/call",
+        "params": {
+            "name": "emotion_detection",
+            "arguments": {"text": text},
+        },
+    }
+    
+    start_time = time.time()
+    try:
+        r = requests.post(message_url, json=payload, timeout=30)
+        response_time = time.time() - start_time
+        return response_time, r.status_code, r.text
+    except Exception as e:
+        response_time = time.time() - start_time
+        return response_time, 0, str(e)
+
+def run_load_test(api_choice: str, concurrent_requests: int, total_requests: int, progress_callback=None):
+    """Run a load test with the specified parameters."""
+    # Test data - simple sentences as requested
+    test_sentences = [
+        "I feel happy",
+        "I feel angry", 
+        "I am confused",
+        "I love it",
+        "I feel sad",
+        "I am excited",
+        "I feel scared",
+        "I am surprised",
+        "I feel disgusted",
+        "I am neutral"
+    ]
+    
+    # Choose the appropriate API function
+    if api_choice == "Direct API":
+        api_func = _call_direct_api_perf
+    else:  # MCP
+        api_func = _call_mcp_api_perf
+    
+    # Results storage
+    results = []
+    errors = 0
+    start_time = time.time()
+    
+    # Create a progress tracking function
+    def update_progress(completed, total, current_tps, p95_time):
+        if progress_callback:
+            progress_callback(completed, total, current_tps, p95_time)
+    
+    # Run the load test
+    with ThreadPoolExecutor(max_workers=concurrent_requests) as executor:
+        # Submit all tasks
+        future_to_index = {}
+        for i in range(total_requests):
+            sentence = test_sentences[i % len(test_sentences)]
+            future = executor.submit(api_func, sentence)
+            future_to_index[future] = i
+        
+        # Process completed tasks
+        completed = 0
+        last_update_time = time.time()
+        
+        for future in as_completed(future_to_index):
+            response_time, status_code, response_text = future.result()
+            results.append({
+                'response_time': response_time,
+                'status_code': status_code,
+                'success': status_code == 200,
+                'timestamp': time.time()
+            })
+            
+            if status_code != 200:
+                errors += 1
+            
+            completed += 1
+            
+            # Update progress every 0.5 seconds or when completed
+            current_time = time.time()
+            if current_time - last_update_time >= 0.5 or completed == total_requests:
+                elapsed = current_time - start_time
+                current_tps = completed / elapsed if elapsed > 0 else 0
+                
+                # Calculate 95th percentile response time
+                if results:
+                    response_times = [r['response_time'] for r in results]
+                    p95_time = statistics.quantiles(response_times, n=20)[18] if len(response_times) > 1 else response_times[0]
+                else:
+                    p95_time = 0
+                
+                update_progress(completed, total_requests, current_tps, p95_time)
+                last_update_time = current_time
+    
+    # Calculate final statistics
+    end_time = time.time()
+    total_elapsed = end_time - start_time
+    
+    if results:
+        response_times = [r['response_time'] for r in results]
+        avg_response_time = statistics.mean(response_times)
+        p95_response_time = statistics.quantiles(response_times, n=20)[18] if len(response_times) > 1 else response_times[0]
+        p99_response_time = statistics.quantiles(response_times, n=100)[98] if len(response_times) > 1 else response_times[0]
+        min_response_time = min(response_times)
+        max_response_time = max(response_times)
+        success_rate = (len(results) - errors) / len(results) * 100
+        avg_tps = len(results) / total_elapsed
+    else:
+        avg_response_time = p95_response_time = p99_response_time = min_response_time = max_response_time = 0
+        success_rate = 0
+        avg_tps = 0
+    
+    return {
+        'total_requests': total_requests,
+        'completed_requests': len(results),
+        'errors': errors,
+        'success_rate': success_rate,
+        'total_elapsed_time': total_elapsed,
+        'average_tps': avg_tps,
+        'average_response_time': avg_response_time,
+        'p95_response_time': p95_response_time,
+        'p99_response_time': p99_response_time,
+        'min_response_time': min_response_time,
+        'max_response_time': max_response_time,
+        'concurrent_requests': concurrent_requests
+    }
+
 def process_message(input_text, api_choice):
     """
     Main function for the Gradio UI. It handles the message submission,
@@ -338,6 +494,46 @@ def process_message(input_text, api_choice):
         
         yield "TIMEOUT: Waited too long for the result from MCP service."
 
+# Performance testing UI functions
+def start_performance_test(api_choice, concurrent_requests, total_requests):
+    """Start a performance test and return results."""
+    try:
+        # Run the load test
+        results = run_load_test(api_choice, concurrent_requests, total_requests)
+        
+        # Format final results
+        results_summary = f"""
+## Performance Test Results
+
+**Test Configuration:**
+- API: {api_choice}
+- Concurrent Requests: {results['concurrent_requests']}
+- Total Requests: {results['total_requests']}
+
+**Test Results:**
+- Completed Requests: {results['completed_requests']}
+- Errors: {results['errors']}
+- Success Rate: {results['success_rate']:.2f}%
+- Total Elapsed Time: {results['total_elapsed_time']:.2f} seconds
+
+**Performance Metrics:**
+- Average TPS: {results['average_tps']:.2f}
+- Average Response Time: {results['average_response_time']:.3f}s
+- 95th Percentile Response Time: {results['p95_response_time']:.3f}s
+- 99th Percentile Response Time: {results['p99_response_time']:.3f}s
+- Min Response Time: {results['min_response_time']:.3f}s
+- Max Response Time: {results['max_response_time']:.3f}s
+
+**Test completed at:** {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}
+"""
+        
+        status_msg = f"Test completed! {results['completed_requests']}/{results['total_requests']} requests processed."
+        return status_msg, results_summary
+        
+    except Exception as e:
+        error_msg = f"Performance test failed: {str(e)}"
+        return error_msg, error_msg
+
 # Function to start the background thread on Gradio load
 def start_sse_thread():
     global sse_thread
@@ -349,40 +545,98 @@ def start_sse_thread():
 # Gradio UI components
 with gr.Blocks(title="MCP Emotion Detector") as demo:
     gr.Markdown("# MCP Emotion Detector")
-    gr.Markdown("Select your API endpoint and enter a message to send to the Supergateway.")
     
-    with gr.Row():
-        api_choice = gr.Radio(choices=["Supergateway (MCP)", "Direct API"], label="API Endpoint", value="Supergateway (MCP)")
-    
-    with gr.Row():
-        message_input = gr.Textbox(
-            label="Message to Analyze"
-        )
-        output_textbox = gr.Textbox(label="Result", interactive=False)
-    
-    # Add a separate gr.Examples component
-    gr.Examples(
-        examples=[
-            "I am so happy with this test!",
-            "I feel quite neutral about this.",
-            "I am getting angry with this failure.",
-            "I am filled with sadness.",
-            "This news has made me feel love.",
-            "I am so angry right now.",
-            "I am scared of the dark."
-        ],
-        inputs=message_input,
-        label="Try these examples"
-    )
+    with gr.Tabs():
+        # Main Emotion Detection Tab
+        with gr.Tab("Emotion Detection"):
+            gr.Markdown("Select your API endpoint and enter a message to send to the Supergateway.")
+            
+            with gr.Row():
+                api_choice = gr.Radio(choices=["Supergateway (MCP)", "Direct API"], label="API Endpoint", value="Supergateway (MCP)")
+            
+            with gr.Row():
+                message_input = gr.Textbox(
+                    label="Message to Analyze"
+                )
+                output_textbox = gr.Textbox(label="Result", interactive=False)
+            
+            # Add a separate gr.Examples component
+            gr.Examples(
+                examples=[
+                    "I am so happy with this test!",
+                    "I feel quite neutral about this.",
+                    "I am getting angry with this failure.",
+                    "I am filled with sadness.",
+                    "This news has made me feel love.",
+                    "I am so angry right now.",
+                    "I am scared of the dark."
+                ],
+                inputs=message_input,
+                label="Try these examples"
+            )
 
-    with gr.Row():
-        submit_btn = gr.Button("Submit", variant="primary")
+            with gr.Row():
+                submit_btn = gr.Button("Submit", variant="primary")
 
-    submit_btn.click(
-        fn=process_message,
-        inputs=[message_input, api_choice],
-        outputs=output_textbox
-    )
+            submit_btn.click(
+                fn=process_message,
+                inputs=[message_input, api_choice],
+                outputs=output_textbox
+            )
+        
+        # Performance Testing Tab
+        with gr.Tab("Performance"):
+            gr.Markdown("## Performance Testing")
+            gr.Markdown("Configure and run load tests to measure API performance. The test will send simple emotion detection requests using sentences like 'I feel happy', 'I feel angry', etc.")
+            
+            with gr.Row():
+                with gr.Column(scale=1):
+                    perf_api_choice = gr.Radio(
+                        choices=["Supergateway (MCP)", "Direct API"], 
+                        label="API Endpoint", 
+                        value="Supergateway (MCP)"
+                    )
+                    
+                    concurrent_requests = gr.Slider(
+                        minimum=1, 
+                        maximum=20, 
+                        value=5, 
+                        step=1, 
+                        label="Concurrent Requests",
+                        info="Number of simultaneous requests (1-20)"
+                    )
+                    
+                    total_requests = gr.Number(
+                        value=500, 
+                        label="Total Requests", 
+                        minimum=1, 
+                        maximum=10000,
+                        info="Number of requests to send during the test"
+                    )
+                    
+                    start_test_btn = gr.Button("Start Performance Test", variant="primary")
+                    
+                    gr.Markdown("**Test Data:** The performance test uses simple sentences like 'I feel happy', 'I feel angry', 'I am confused', 'I love it', etc.")
+                
+                with gr.Column(scale=2):
+                    status_text = gr.Textbox(
+                        label="Test Status", 
+                        value="Ready to start performance test. Click 'Start Performance Test' to begin.",
+                        interactive=False,
+                        lines=3
+                    )
+                    
+                    results_text = gr.Markdown(
+                        value="Results will appear here after the test completes.",
+                        label="Test Results"
+                    )
+            
+            # Connect the performance test button
+            start_test_btn.click(
+                fn=start_performance_test,
+                inputs=[perf_api_choice, concurrent_requests, total_requests],
+                outputs=[status_text, results_text]
+            )
     
     # Start the SSE thread when the Gradio app is loaded in the browser
     demo.load(fn=start_sse_thread)
