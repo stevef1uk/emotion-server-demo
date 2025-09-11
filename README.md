@@ -4,7 +4,7 @@ A complete Docker Compose setup for the Emotion API service, featuring a **Gradi
 
 ![The UI](https://raw.githubusercontent.com/stevef1uk/emotion-server-demo/master/images/ui.png)
 
-
+There is now alos a Performance Tab to allow you to load test the container
 ***
 
 ### Architecture
