@@ -59,6 +59,8 @@ cd src
 * For an Intel machine (AMD64):
     `IMAGE_TAG=amd64 docker-compose up --build -d`
 
+NOTE: If you have podman just use podman-compose
+
 ***Note:*** *The initial build may take a few minutes as it downloads base images and dependencies.*
 
 3.  **Access the services:**
