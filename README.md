@@ -132,6 +132,69 @@ You can test the **Emotion API** directly from the command line using `curl`. Th
         {"emotion":"happy","confidence":1}
         ```
 
+3.  **Run the pre-prepared texts from inside the `tests` folder**
+
+    If you prefer to run the provided examples exactly as-is, change into the `tests` directory and post the JSON files directly:
+
+    ```bash
+    cd tests
+    curl -s -X POST http://localhost:8000/predict \
+      -H "Content-Type: application/json" \
+      -d @request_happy.json | jq .
+
+    curl -s -X POST http://localhost:8000/predict \
+      -H "Content-Type: application/json" \
+      -d @request_anger.json | jq .
+    ```
+
+    Example outputs:
+    ```json
+    {"emotion":"happiness","confidence":1}
+    {"emotion":"anger","confidence":1}
+    ```
+
+***
+
+### Helper script: send any file as input
+
+To safely send the contents of any file as the request body (`{"text":"..."}`), a helper script is provided at `tests/predict_file.sh`.
+
+1.  Make it executable (first time only):
+
+    ```bash
+    chmod +x tests/predict_file.sh
+    ```
+
+2.  Usage:
+
+    ```bash
+    # From the repository root
+    ./tests/predict_file.sh /path/to/my.txt
+
+    # Or from the tests directory
+    cd tests
+    ./predict_file.sh ./my.txt
+
+    # Optional: override the endpoint
+    ./predict_file.sh -u http://localhost:8000/predict ./my.txt
+    ```
+
+    The script uses `jq -Rs` to ensure all characters are correctly JSON-escaped and posts the payload to the API.
+
+3.  Example run and output:
+
+    ```bash
+    # From the repository root
+    ./tests/predict_file.sh ./tests/email2.txt
+    {
+      "text": "Hi Tony\n\nCouple of things - your product has destroyed my computer\n\nI am going to remove your product and tell everyone I know not to buy it!\n"
+    }
+    {
+      "emotion": "anger",
+      "confidence": 1
+    }
+    ```
+
 ***
 
 ### Service Details

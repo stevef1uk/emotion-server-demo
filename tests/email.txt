@@ -1,0 +1,7 @@
+Hi Tony
+
+Couple of things - email is too long. Incentive is weak. I have no use-case for solar generating paint, and we've not previously spoken about a need or interest in this area.
+
+You mention "120" 120b? model.. what is needed to run that? Generally only models up to 7B or so will run on CPU/smaller GPUs. A confusing detail, perhaps think about that.
+
+
