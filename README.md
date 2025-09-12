@@ -278,6 +278,10 @@ The user-friendly Gradio UI provides a straightforward way to interact with the 
     * `EMOTION_SERVICE_URL=http://emotion-api:8000/predict`
     * `MCP_SERVER_PORT=9000`
 
+![MCP Integration Example](images/Example_of_MCP_Integration.png)
+
+*Screenshot showing the MCP tool being used by a 3rd party application*
+
 ***
 
 ### Management Commands
