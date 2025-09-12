@@ -57,17 +57,35 @@ The stack consists of three main services:
 
 ### Project Structure
 
-The project structure has been updated to reflect the new Gradio UI setup, the location of the **mcp-go-server**, and the addition of a **tests** directory.
+The project structure includes the core emotion service stack, demo projects, and supporting files:
 ```
 ├── docker-compose.yml
 ├── src/
-│   └── all source file
+│   ├── Demo_Agentic_Routing/          # CrewAI customer service demo
+│   │   ├── demo.py
+│   │   ├── test_api.py
+│   │   └── README.md
+│   ├── Demo_Firehose/                 # React social media sentiment monitor
+│   │   ├── src/
+│   │   ├── package.json
+│   │   └── README.md
+│   ├── mcp-go-server/                 # MCP server implementation
+│   │   ├── main.go
+│   │   └── go.mod
+│   ├── modal/                         # Modal deployment files
+│   ├── tests/                         # Test files and scripts
+│   ├── ui/                           # Gradio UI
+│   └── dev.sh
 ├── tests/
 │   ├── request_anger.json
-│   └── request_happy.json
-├── token_renewal
-│   └── token_renewal/build-updated-image.sh
+│   ├── request_happy.json
+│   └── predict_file.sh
+├── token_renewal/
+│   ├── build-updated-image.sh
 │   └── Dockerfile
+├── images/                           # Project images and screenshots
+├── Business_Case.md
+└── README.md
 ```
 
 ***
