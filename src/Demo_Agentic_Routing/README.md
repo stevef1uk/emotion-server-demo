@@ -100,17 +100,18 @@ After running the demo, you'll see a comprehensive summary like this:
 📊 EMOTION-BASED ESCALATION SUMMARY
 ============================================================
 Total Interactions: 4
-Escalations: 1
-Escalation Rate: 25.0%
+Escalations: 2
+Escalation Rate: 50.0%
 
 🎯 Emotion Detection Results:
-- Customer CUST001: neutral (50.0%) → ✅ Handled
-- Customer CUST002: angry (90.0%) → ⚠️ ESCALATED
-- Customer CUST003: frustrated (80.0%) → ✅ Handled
-- Customer CUST004: happy (90.0%) → ✅ Handled
+- Customer CUST001: frustrated (100.0%) → ✅ Handled
+- Customer CUST002: angry (100.0%) → ⚠️ ESCALATED
+- Customer CUST003: angry (100.0%) → ⚠️ ESCALATED
+- Customer CUST004: happy (100.0%) → ✅ Handled
 
 🚨 Escalated Cases:
-- Customer CUST002 (angry): Successfully escalated to Manager MGR155. Ticket: ESC-CUST002-3677
+- Customer CUST002 (angry): Successfully escalated to Manager MGR469. Ticket: ESC-CUST002-5037
+- Customer CUST003 (angry): Successfully escalated to Manager MGR448. Ticket: ESC-CUST003-5119
 
 ✅ Demo completed! Your emotion API integration is working!
 💡 The system automatically escalates based on:
