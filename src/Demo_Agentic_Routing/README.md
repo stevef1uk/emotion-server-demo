@@ -29,22 +29,36 @@ Each agent has specific tools and responsibilities, working together in a sequen
 
 - Python 3.8 or higher
 - pip package manager
+- **Emotion API service running** (from the main project)
 
 ### Installation
 
-1. **Navigate to the demo directory:**
+1. **Start the emotion service first:**
    ```bash
-   cd src/Demo_Agentic_Routing
+   cd src
+   # For Mac (ARM64):
+   IMAGE_TAG=arm64 docker-compose up --build -d
+   # For Mac (Intel):
+   IMAGE_TAG=mac_amd64 docker-compose up --build -d
+   # For RPi (ARM):
+   IMAGE_TAG=arm docker-compose up --build -d
+   # For Intel machine (AMD64):
+   IMAGE_TAG=amd64 docker-compose up --build -d
    ```
 
-2. **Install required dependencies:**
+2. **Navigate to the demo directory:**
    ```bash
-   pip install crewai langchain-openai pydantic
+   cd Demo_Agentic_Routing
    ```
 
-   **Note:** The demo will work without these dependencies for demonstration purposes, but you'll see a note about missing packages.
+3. **Install required dependencies:**
+   ```bash
+   pip install crewai langchain-openai pydantic requests
+   ```
 
-3. **Optional: Set up OpenAI API (for full functionality):**
+   **Note:** The demo will work without CrewAI dependencies for demonstration purposes, but you'll see a note about missing packages.
+
+4. **Optional: Set up OpenAI API (for full functionality):**
    ```bash
    export OPENAI_API_KEY="your-openai-api-key"
    ```
@@ -53,11 +67,15 @@ Each agent has specific tools and responsibilities, working together in a sequen
 
 ### Quick Start
 
-Simply run the demo script:
+1. **Test the emotion API first (optional):**
+   ```bash
+   python test_api.py
+   ```
 
-```bash
-python demo.py
-```
+2. **Run the demo script:**
+   ```bash
+   python demo.py
+   ```
 
 ### What Happens When You Run It
 
@@ -106,17 +124,22 @@ Escalation Rate: 25.0%
 
 ### Sentiment Analysis
 
-The demo uses a keyword-based sentiment analysis system that detects:
-- **Anger indicators**: "angry", "furious", "mad", "hate", "terrible", etc.
-- **Frustration indicators**: "annoyed", "disappointed", "confused", "problem", etc.
-- **Positive indicators**: "happy", "great", "excellent", "love", "thank you", etc.
+The demo integrates with the main emotion API service to perform real emotion detection:
+- **Primary**: Uses the emotion API at `http://localhost:8000/predict` for accurate emotion detection
+- **Fallback**: If the API is unavailable, falls back to keyword-based sentiment analysis
+- **Emotion Mapping**: Maps API emotions to customer service categories:
+  - `anger`, `disgust` → ANGRY (immediate escalation)
+  - `sadness`, `fear`, `confusion` → FRUSTRATED (escalate if high confidence)
+  - `happiness`, `love`, `surprise` → HAPPY (no escalation needed)
+  - `neutral` or other → NEUTRAL (normal handling)
 
 ### Escalation Logic
 
 The system escalates customers based on:
-- **Immediate escalation**: High anger indicators (2+ anger keywords)
-- **Normal handling**: Neutral, positive, or low frustration cases
-- **Mock API integration**: Simulates real escalation API calls
+- **Immediate escalation**: Anger or disgust emotions from the API (high confidence)
+- **Conditional escalation**: Sadness, fear, or confusion emotions (if high confidence)
+- **Normal handling**: Happiness, love, surprise, or neutral emotions
+- **Mock API integration**: Simulates real escalation API calls for demonstration
 
 ### Agent Workflow
 
@@ -160,17 +183,27 @@ positive_keywords = ["happy", "great", "your_new_keyword"]
 
 ## 🔗 Integration with Emotion Service
 
-This demo is designed to work with the main emotion service stack. While it currently uses a mock sentiment analysis system, it can be easily integrated with the actual emotion API:
+This demo is fully integrated with the main emotion service stack:
 
-1. **Replace the mock sentiment analysis** with calls to the emotion API
-2. **Use real escalation APIs** instead of the simulated ones
-3. **Integrate with your customer service platform**
+1. **Real Emotion API Integration** - Uses the actual emotion API for sentiment analysis
+2. **Automatic Fallback** - Falls back to keyword analysis if the API is unavailable
+3. **API Health Checking** - Verifies the emotion service is running before starting
+4. **Configurable Endpoints** - Easy to modify API URLs for different environments
+
+### API Requirements
+
+- **Emotion API**: Must be running on `http://localhost:8000/predict`
+- **Expected Response Format**: `{"emotion": "emotion_name", "confidence": 0.0-1.0}`
+- **Timeout**: 10 seconds for API calls
+- **Fallback**: Automatic fallback to keyword-based analysis if API fails
 
 ## 📝 Key Features
 
 - **Multi-Agent Architecture** - Uses CrewAI for agent orchestration
-- **Intelligent Escalation** - Automatic escalation based on sentiment analysis
-- **Mock API Integration** - Simulates real-world API calls
+- **Real Emotion API Integration** - Uses the actual emotion service for sentiment analysis
+- **Intelligent Escalation** - Automatic escalation based on real emotion detection
+- **Robust Fallback System** - Falls back to keyword analysis if API is unavailable
+- **API Health Monitoring** - Checks emotion service availability before starting
 - **Comprehensive Logging** - Detailed output showing agent decision-making
 - **Easy Customization** - Simple to modify test cases and rules
 - **Educational Value** - Great for learning about AI agent collaboration
@@ -179,14 +212,21 @@ This demo is designed to work with the main emotion service stack. While it curr
 
 ### Common Issues
 
-1. **Import Errors**: Make sure you've installed the required dependencies:
+1. **Emotion API Not Running**: 
+   - Make sure the emotion service is started: `cd src && IMAGE_TAG=amd64 docker-compose up --build -d`
+   - Check that the API is accessible: `curl http://localhost:8000/health`
+   - The demo will fall back to keyword analysis if the API is unavailable
+
+2. **Import Errors**: Make sure you've installed the required dependencies:
    ```bash
-   pip install crewai langchain-openai pydantic
+   pip install crewai langchain-openai pydantic requests
    ```
 
-2. **Missing OpenAI Key**: The demo works without it, but you'll see a note about missing packages.
+3. **Missing OpenAI Key**: The demo works without it, but you'll see a note about missing packages.
 
-3. **Python Version**: Ensure you're using Python 3.8 or higher.
+4. **Python Version**: Ensure you're using Python 3.8 or higher.
+
+5. **API Connection Timeout**: If the emotion API is slow to respond, the demo will timeout after 10 seconds and use fallback analysis.
 
 ### Getting Help
 

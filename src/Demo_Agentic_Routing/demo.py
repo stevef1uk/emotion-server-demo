@@ -4,18 +4,17 @@ CrewAI Agentic Customer Service Demo with API Escalation
 Demonstrates intelligent customer service routing with escalation capabilities
 """
 
-import os
 import json
 import random
-from typing import Dict, Any, Optional
+import requests
+from typing import Dict, Any
 from dataclasses import dataclass
 from enum import Enum
 
 try:
     from crewai import Agent, Task, Crew, Process
     from crewai.tools import BaseTool
-    from langchain_openai import ChatOpenAI
-    from pydantic import BaseModel, Field
+    from pydantic import Field
 except ImportError:
     print("Note: This demo requires 'pip install crewai langchain-openai pydantic'")
     print("For demonstration purposes, we'll show the structure without actual execution")
@@ -46,7 +45,7 @@ class EscalationTool(BaseTool):
     api_endpoint: str = Field(..., description="The API endpoint for escalation.")
     api_key: str = Field(..., description="The API key for authentication.")
 
-    def _run(self, customer_id: str, reason: str, urgency: str = "high") -> str:
+    def _run(self, customer_id: str, reason: str, urgency: str = "high") -> str:  # noqa: ARG002
         """Simulate the escalation API call"""
         # --- START OF FIX ---
         print("\n[MOCK API] Simulating API call for escalation...")
@@ -68,14 +67,64 @@ class EscalationTool(BaseTool):
         # --- END OF FIX ---
 
 class SentimentAnalysisTool(BaseTool):
-    """Tool for analyzing customer sentiment"""
+    """Tool for analyzing customer sentiment using the emotion API"""
     
     name: str = "sentiment_analyzer"
-    description: str = "Analyzes customer message sentiment to detect anger or frustration"
+    description: str = "Analyzes customer message sentiment using the emotion API to detect emotions"
+    emotion_api_url: str = Field(default="http://localhost:8000/predict", description="The emotion API endpoint URL")
     
     def _run(self, message: str) -> Dict[str, Any]:
-        """Analyze sentiment of customer message"""
-        # Simple keyword-based sentiment analysis
+        """Analyze sentiment of customer message using the emotion API"""
+        try:
+            # Call the emotion API
+            response = requests.post(
+                self.emotion_api_url,
+                json={"text": message},
+                headers={"Content-Type": "application/json"},
+                timeout=10
+            )
+            
+            if response.status_code == 200:
+                emotion_data = response.json()
+                emotion = emotion_data.get("emotion", "neutral")
+                confidence = emotion_data.get("confidence", 0.5)
+                
+                # Map emotion API results to our sentiment categories
+                if emotion in ["anger", "disgust"]:
+                    sentiment = CustomerSentiment.ANGRY
+                    anger_indicators = 2 if confidence > 0.7 else 1
+                    frustration_indicators = 0
+                elif emotion in ["sadness", "fear", "confusion"]:
+                    sentiment = CustomerSentiment.FRUSTRATED
+                    anger_indicators = 0
+                    frustration_indicators = 2 if confidence > 0.7 else 1
+                elif emotion in ["happiness", "love", "surprise"]:
+                    sentiment = CustomerSentiment.HAPPY
+                    anger_indicators = 0
+                    frustration_indicators = 0
+                else:  # neutral or other
+                    sentiment = CustomerSentiment.NEUTRAL
+                    anger_indicators = 0
+                    frustration_indicators = 0
+                
+                return {
+                    "sentiment": sentiment.value,
+                    "confidence": confidence,
+                    "emotion_api_result": emotion,
+                    "anger_indicators": anger_indicators,
+                    "frustration_indicators": frustration_indicators
+                }
+            else:
+                print(f"⚠️ Emotion API returned status {response.status_code}, falling back to keyword analysis")
+                return self._fallback_analysis(message)
+                
+        except requests.exceptions.RequestException as e:
+            print(f"⚠️ Failed to connect to emotion API: {e}")
+            print("🔄 Falling back to keyword-based sentiment analysis...")
+            return self._fallback_analysis(message)
+    
+    def _fallback_analysis(self, message: str) -> Dict[str, Any]:
+        """Fallback keyword-based sentiment analysis if API is unavailable"""
         anger_keywords = ["angry", "furious", "mad", "hate", "terrible", "awful",
                           "disgusted", "frustrated", "outraged", "unacceptable"]
         
@@ -102,6 +151,7 @@ class SentimentAnalysisTool(BaseTool):
         return {
             "sentiment": sentiment.value,
             "confidence": min(0.9, (anger_score + frustration_score + positive_score) * 0.3 + 0.5),
+            "emotion_api_result": "fallback",
             "anger_indicators": anger_score,
             "frustration_indicators": frustration_score
         }
@@ -110,11 +160,12 @@ class CustomerServiceDemo:
     """Main demo class orchestrating the CrewAI agents"""
     
     def __init__(self, api_endpoint: str = "https://your-api.com/api/v1",
-                 api_key: str = "your-api-key"):
+                 api_key: str = "your-api-key",
+                 emotion_api_url: str = "http://localhost:8000/predict"):
         
         # Initialize tools
         self.escalation_tool = EscalationTool(api_endpoint=api_endpoint, api_key=api_key)
-        self.sentiment_tool = SentimentAnalysisTool()
+        self.sentiment_tool = SentimentAnalysisTool(emotion_api_url=emotion_api_url)
         
         # Configure LLM (you'll need to set your OpenAI API key)
         # os.environ["OPENAI_API_KEY"] = "your-openai-key"
@@ -196,27 +247,12 @@ class CustomerServiceDemo:
         print(f"Message: {interaction.message}")
         print(f"{'='*60}")
         
-        # Create crew with agents and tasks
-        crew = Crew(
-            agents=[self.escalation_agent, self.customer_service_agent, self.qa_agent],
-            tasks=[self.sentiment_analysis_task, self.customer_response_task, self.escalation_decision_task],
-            process=Process.sequential,
-            verbose=True
-        )
-        
-        # Prepare context for agents
-        context = {
-            "customer_id": interaction.customer_id,
-            "customer_message": interaction.message,
-            "interaction_context": f"Customer {interaction.customer_id} sent: '{interaction.message}'"
-        }
-        
         try:
             # For demo purposes, simulate the workflow
             result = self.simulate_workflow(interaction)
             return result
             
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001
             print(f"Error processing interaction: {str(e)}")
             return {"error": str(e), "escalated": False}
     
@@ -232,9 +268,9 @@ class CustomerServiceDemo:
         print("\n👥 Customer Service Agent: Crafting response...")
         
         if sentiment_result["sentiment"] in ["angry", "frustrated"]:
-            response = f"I sincerely apologize for the frustration you're experiencing. Let me personally ensure this gets resolved immediately."
+            response = "I sincerely apologize for the frustration you're experiencing. Let me personally ensure this gets resolved immediately."
         else:
-            response = f"Thank you for contacting us! I'm here to help you with your inquiry."
+            response = "Thank you for contacting us! I'm here to help you with your inquiry."
         
         print(f"Service Response: {response}")
         
@@ -271,12 +307,27 @@ def main():
     
     # Initialize the demo system
     print("🚀 Initializing CrewAI Customer Service Demo")
+    print("🔍 Checking emotion API availability...")
     
-    # The API endpoint and key are no longer used for an external call,
-    # but we keep them to maintain the original structure.
+    # Check if emotion API is running
+    try:
+        response = requests.get("http://localhost:8000/health", timeout=5)
+        if response.status_code == 200:
+            print("✅ Emotion API is running and accessible")
+        else:
+            print(f"⚠️ Emotion API returned status {response.status_code}")
+    except requests.exceptions.RequestException:
+        print("⚠️ Emotion API is not accessible at http://localhost:8000/health")
+        print("💡 Make sure to start the emotion service first:")
+        print("   cd src && IMAGE_TAG=amd64 docker-compose up --build -d")
+        print("   (or use the appropriate IMAGE_TAG for your platform)")
+        print("🔄 Continuing with fallback sentiment analysis...")
+    
+    # Initialize the demo with emotion API integration
     demo = CustomerServiceDemo(
         api_endpoint="https://your-manager-routing-api.com/api/v1",
-        api_key="your-secret-api-key"
+        api_key="your-secret-api-key",
+        emotion_api_url="http://localhost:8000/predict"
     )
     
     # Test scenarios
@@ -335,12 +386,12 @@ def main():
             sentiment_data = result["sentiment_analysis"]
             print(f"- Customer {result['customer_id']} ({sentiment_data['sentiment']}): {result['escalation_details']}")
     
-    print(f"\n✅ Demo completed! Your emotion API integration is working!")
-    print(f"💡 The system automatically escalates based on:")
-    print(f"   • anger 😡 & disgust 🤢 → Immediate escalation")
-    print(f"   • sadness 😢, fear 😨, confusion 😕 → Escalate if high confidence")
-    print(f"   • sarcasm 🤨 → Escalate if moderate confidence")
-    print(f"   • happiness 😊, love ❤️, surprise 😲 → No escalation needed")
+    print("\n✅ Demo completed! Your emotion API integration is working!")
+    print("💡 The system automatically escalates based on:")
+    print("   • anger 😡 & disgust 🤢 → Immediate escalation")
+    print("   • sadness 😢, fear 😨, confusion 😕 → Escalate if high confidence")
+    print("   • sarcasm 🤨 → Escalate if moderate confidence")
+    print("   • happiness 😊, love ❤️, surprise 😲 → No escalation needed")
 
 if __name__ == "__main__":
     main()
