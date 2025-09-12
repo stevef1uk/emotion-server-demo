@@ -5,6 +5,24 @@ A complete Docker Compose setup for the Emotion API service, featuring a **Gradi
 ![The UI](https://raw.githubusercontent.com/stevef1uk/emotion-server-demo/master/images/ui.png)
 
 There is now also a Performance Tab to allow you to load test the container
+
+## 🎬 Demo & Additional Projects
+
+### Live Demo
+Watch the emotion service in action: **[YouTube Demo Video](https://youtu.be/msqaPh8Xq78)**
+
+### Demo_Firehose Project
+This repository also includes a React-based social media sentiment monitoring dashboard:
+
+- **Project Location:** [`src/Demo_Firehose/`](./src/Demo_Firehose/)
+- **Project README:** [`src/Demo_Firehose/README.md`](./src/Demo_Firehose/README.md)
+
+The Demo_Firehose project provides a real-time social media sentiment monitoring interface with:
+- Live message streaming with sentiment analysis
+- Interactive dashboard with circular gauges and progress bars
+- Configurable message generation speed (1x to 100x TPS)
+- Color-coded sentiment visualization
+- Real-time API status monitoring
 ***
 
 ### Architecture
