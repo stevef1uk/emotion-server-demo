@@ -9,10 +9,10 @@ There is now also a Performance Tab to allow you to load test the container
 ## 🎬 Demo & Additional Projects
 
 ### Live Demo
-Watch the emotion service in action: **[YouTube Demo Video](https://youtu.be/msqaPh8Xq78)**
+Watch the emotion service in action: [YouTube Demo Video](https://youtu.be/msqaPh8Xq78)
 
 ### Demo_Firehose Project
-This repository also includes a React-based social media sentiment monitoring dashboard:
+This repository includes a React-based social media sentiment monitoring dashboard:
 
 - **Project Location:** [`src/Demo_Firehose/`](./src/Demo_Firehose/)
 - **Project README:** [`src/Demo_Firehose/README.md`](./src/Demo_Firehose/README.md)
@@ -23,13 +23,26 @@ The Demo_Firehose project provides a real-time social media sentiment monitoring
 - Configurable message generation speed (1x to 100x TPS)
 - Color-coded sentiment visualization
 - Real-time API status monitoring
+
+### Demo_Agentic_Routing Project
+This repository also includes a CrewAI-powered customer service demo that demonstrates intelligent emotion-based routing and escalation:
+
+- **Project Location:** [`src/Demo_Agentic_Routing/`](./src/Demo_Agentic_Routing/)
+- **Project README:** [`src/Demo_Agentic_Routing/README.md`](./src/Demo_Agentic_Routing/README.md)
+
+The Demo_Agentic_Routing project showcases AI agent collaboration for customer service with:
+- Multi-agent sentiment analysis and response generation
+- Automatic escalation based on customer emotion detection
+- CrewAI framework integration for agent orchestration
+- Simulated customer service workflow demonstrations
+- Quality assurance and monitoring capabilities
 ***
 
 ### Architecture
 
 The stack consists of three main services:
 
-* **Emotion API (emotion-api):** The core Go server that runs the emotion analysis model using **llama.cpp** integration. This is the source of truth for emotion predictions. It contains a fine-tuned gemeni3:120 model embedded in a docker container. This componnet is external to this project see: https://hub.docker.com/repository/docker/stevef1uk/emotion-service/general for details and the Business_Case.md file here:https://github.com/stevef1uk/emotion-server-demo/blob/master/Business_Case.md
+* **Emotion API (emotion-api):** The core Go server that runs the emotion analysis model using **llama.cpp** integration. This is the source of truth for emotion predictions. It contains a fine-tuned gemeni3:120 model embedded in a docker container. This component is external to this project - see the [Docker Hub repository](https://hub.docker.com/repository/docker/stevef1uk/emotion-service/general) for details and the [Business_Case.md](./Business_Case.md) file for more information.
 * **Gradio UI (emotion-ui):** A user-friendly Gradio-based web interface that allows for easy interaction with the service. It can send prediction requests directly to the **emotion-api** or via the **emotion-mcp** server.
 * **MCP Server (emotion-mcp):** A Go-based server that acts as a proxy, demonstrating the **Model Context Protocol (MCP)** approach. It routes requests from the UI to the Emotion API.
 

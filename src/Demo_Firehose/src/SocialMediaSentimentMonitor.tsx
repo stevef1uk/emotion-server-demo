@@ -299,18 +299,26 @@ export default function SocialMediaSentimentMonitor() {
     }
 
     if (isRunning && speedMultiplier > 0) {
-      const intervalTime = Math.max(50, 1000 / speedMultiplier);
+      const intervalTime = Math.max(10, 1000 / speedMultiplier);
       
-      intervalRef.current = setInterval(() => {
-        generateSingleMessage().catch(error => {
-          console.error('Error in message generation interval:', error);
-        });
-      }, intervalTime);
+      const scheduleNextMessage = () => {
+        intervalRef.current = setTimeout(async () => {
+          try {
+            await generateSingleMessage();
+          } catch (error) {
+            console.error('Error in message generation:', error);
+          }
+          // Schedule the next message after this one completes
+          scheduleNextMessage();
+        }, intervalTime);
+      };
+      
+      scheduleNextMessage();
     }
 
     return () => {
       if (intervalRef.current) {
-        clearInterval(intervalRef.current);
+        clearTimeout(intervalRef.current);
         intervalRef.current = null;
       }
     };
