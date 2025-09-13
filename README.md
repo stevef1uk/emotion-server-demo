@@ -123,9 +123,11 @@ NOTE: If you have podman just use podman-compose
 
 ### Hosted API Alternative
 
-For those who don't want to run the Emotion Service API container locally, a hosted version is available at Modal.com:
+For those who don't want to run the Emotion Service API container locally, hosted versions are available at Modal.com:
 
 **Hosted API Endpoint:** `https://stevef1uk--emotion-server-serve.modal.run/predict`
+
+**Hosted MCP Server Endpoint:** `https://stevef1uk--mcp-emotion-server-working-solution-serve.modal.run/mcp`
 
 You can test the hosted API directly using curl:
 
@@ -139,9 +141,28 @@ This will return a JSON response similar to:
 ```json
 {"emotion":"anger","confidence":1}
 ```
+
+You can also test the hosted MCP server:
+
+```bash
+curl -X POST https://stevef1uk--mcp-emotion-server-working-solution-serve.modal.run/mcp \
+  -H "Content-Type: application/json" \
+  -d '{
+    "jsonrpc": "2.0",
+    "id": 1,
+    "method": "tools/call",
+    "params": {
+      "name": "emotion_detection",
+      "arguments": {
+        "text": "I am so excited about this!"
+      }
+    }
+  }'
+```
+
 ** The first request could take 10s as the container has to spin-up but subsequent requests will be faster although not as fast as running it locally!
 
-**Note:** When using the hosted API, update the API endpoint in your applications from `http://localhost:8000/predict` to `https://stevef1uk--emotion-server-serve.modal.run/predict`.
+**Note:** When using the hosted API, update the API endpoint in your applications from `http://localhost:8000/predict` to `https://stevef1uk--emotion-server-serve.modal.run/predict`. For MCP integration, use the MCP endpoint at `https://stevef1uk--mcp-emotion-server-working-solution-serve.modal.run/mcp`.
 
 ***
 
