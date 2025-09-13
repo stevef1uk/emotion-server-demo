@@ -139,7 +139,7 @@ This will return a JSON response similar to:
 ```json
 {"emotion":"anger","confidence":1}
 ```
-** The first requests could take 10s as the container has to spint-up but subsequent requests will be faster although not as fast as runnimng it locally!
+** The first requests could take 10s as the container has to spin-up but subsequent requests will be faster although not as fast as running it locally!
 
 **Note:** When using the hosted API, update the API endpoint in your applications from `http://localhost:8000/predict` to `https://stevef1uk--emotion-server-serve.modal.run/predict`.
 
