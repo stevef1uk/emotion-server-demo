@@ -121,6 +121,30 @@ NOTE: If you have podman just use podman-compose
 
 ***
 
+### Hosted API Alternative
+
+For those who don't want to run the Emotion Service API container locally, a hosted version is available at Modal.com:
+
+**Hosted API Endpoint:** `https://stevef1uk--emotion-server-serve.modal.run/predict`
+
+You can test the hosted API directly using curl:
+
+```bash
+curl -s -X POST https://stevef1uk--emotion-server-serve.modal.run/predict \
+  -H "Content-Type: application/json" \
+  -d '{"text":"I am so angry today!"}'
+```
+
+This will return a JSON response similar to:
+```json
+{"emotion":"anger","confidence":1}
+```
+** The first requests could take 10s as the container has to spint-up but subsequent requests will be faster although not as fast as runnimng it locally!
+
+**Note:** When using the hosted API, update the API endpoint in your applications from `http://localhost:8000/predict` to `https://stevef1uk--emotion-server-serve.modal.run/predict`.
+
+***
+
 ** Interacting with the Gradio UI **
 
 The Gradio UI provides a simple, web-based interface for interacting with the emotion service.
