@@ -218,7 +218,25 @@ def health_check():
 @web_app.route('/sse', methods=['GET'])
 def sse_endpoint():
     """Handle SSE connections for MCP protocol."""
-    return "SSE endpoint - MCP server is running", 200
+    from flask import Response
+    
+    def generate_sse():
+        # Send initial connection event
+        yield "data: {\"type\": \"connected\", \"message\": \"MCP server connected\"}\n\n"
+        # Send a few more events and then close
+        yield "data: {\"type\": \"ready\", \"message\": \"MCP server ready\"}\n\n"
+        yield "data: {\"type\": \"heartbeat\", \"timestamp\": " + str(int(__import__('time').time())) + "}\n\n"
+    
+    return Response(
+        generate_sse(),
+        mimetype='text/event-stream',
+        headers={
+            'Cache-Control': 'no-cache',
+            'Connection': 'keep-alive',
+            'Access-Control-Allow-Origin': '*',
+            'Access-Control-Allow-Headers': 'Cache-Control'
+        }
+    )
 
 @web_app.route('/message', methods=['POST'])
 def message_endpoint():
