@@ -127,6 +127,8 @@ For those who don't want to run the Emotion Service API container locally, hoste
 
 **Hosted API Endpoint:** `https://stevef1uk--emotion-server-serve.modal.run/predict`
 
+**Hosted Detailed API Endpoint:** `https://stevef1uk--emotion-server-serve.modal.run/predict_detailed` *(Available September 16, 2025)*
+
 **Hosted MCP Server Endpoint:** `https://stevef1uk--mcp-emotion-server-working-solution-serve.modal.run/mcp`
 
 You can test the hosted API directly using curl:
@@ -194,7 +196,41 @@ You can test the **Emotion API** directly from the command line using `curl`. Th
     {"emotion":"happy","confidence":1}
     ```
 
-2.  **Using Test Files from the `tests` Directory**
+2.  **Detailed Emotion Analysis (Local Only)**
+
+    For more comprehensive emotion analysis, you can use the detailed endpoint that returns all emotions with their probabilities:
+
+    ```bash
+    curl -s -X POST http://localhost:8000/predict_detailed \
+      -H "Content-Type: application/json" \
+      -d '{"text":"I am so happy today!"}'
+    ```
+    
+    This will return a detailed JSON response with all emotions:
+    ```json
+    {
+      "predicted_emotion": "happiness",
+      "confidence": 0.67,
+      "all_emotions": {
+        "happiness": 0.67,
+        "shame": 0.51,
+        "confusion": 0.18,
+        "anger": 0.0,
+        "fear": 0.0,
+        "disgust": 0.0,
+        "surprise": 0.0,
+        "neutral": 0.0,
+        "love": 0.0,
+        "desire": 0.0,
+        "guilt": 0.0,
+        "sarcasm": 0.0
+      }
+    }
+    ```
+
+    **Note:** The detailed endpoint is currently only available in the local Docker setup. The hosted version will be deployed on **September 16, 2025**.
+
+3.  **Using Test Files from the `tests` Directory**
 
     For more complex requests or to easily repeat tests, you can use the JSON files located in the newly added `tests` directory. The `@` symbol in `curl` tells it to read the request body from a file.
 
