@@ -194,14 +194,60 @@ def _format_emotion_response(emotion: str, confidence: float) -> str:
     }
     
     indicator = emotion_indicators.get(emotion.lower(), "[UNKNOWN]")
-    return f"{emotion.title()} {indicator} (Confidence: {confidence:.2%})"
-    
-    emoji = emotion_emojis.get(emotion.lower(), "🤔")
-    return f"{emotion.title()} {emoji} (Confidence: {confidence:.2%})"
+    return f"{emotion.title()} {indicator} (Confidence: {confidence:.4f})"
 
-def _call_direct_api(text: str) -> tuple[int, str]:
+def _format_detailed_response(response_data: dict) -> str:
+    """Format the detailed emotion response with all emotions and probabilities."""
+    if "all_emotions" not in response_data:
+        return "ERROR: Detailed response format not recognized"
+    
+    emotions = response_data["all_emotions"]
+    primary_emotion = response_data.get("predicted_emotion", "unknown")
+    primary_confidence = response_data.get("confidence", 0.0)
+    
+    # Format primary emotion
+    result = f"🎯 Primary Emotion: {_format_emotion_response(primary_emotion, primary_confidence)}\n\n"
+    
+    # Format all emotions with probabilities
+    result += "📊 All Emotions:\n"
+    result += "=" * 50 + "\n"
+    
+    # Filter out emotions with very low probability (less than 0.01) and sort by probability (highest first)
+    meaningful_emotions = {emotion: prob for emotion, prob in emotions.items() if prob >= 0.01}
+    sorted_emotions = sorted(meaningful_emotions.items(), key=lambda x: x[1], reverse=True)
+    
+    emotion_indicators = {
+        "happiness": "[HAPPY]",
+        "joy": "[JOY]", 
+        "happy": "[HAPPY]",
+        "sadness": "[SAD]",
+        "sad": "[SAD]",
+        "anger": "[ANGRY]",
+        "angry": "[ANGRY]",
+        "fear": "[FEAR]",
+        "scared": "[FEAR]",
+        "disgust": "[DISGUST]",
+        "surprise": "[SURPRISE]",
+        "neutral": "[NEUTRAL]",
+        "love": "[LOVE]",
+        "excitement": "[EXCITED]",
+        "confusion": "[CONFUSED]",
+        "desire": "[DESIRE]",
+        "guilt": "[GUILT]",
+        "shame": "[SHAME]",
+        "sarcasm": "[SARCASTIC]"
+    }
+    
+    for emotion, probability in sorted_emotions:
+        indicator = emotion_indicators.get(emotion.lower(), "[UNKNOWN]")
+        result += f"{emotion.title():<12} {indicator} {probability:.4f}\n"
+    
+    return result
+
+def _call_direct_api(text: str, detailed: bool = False) -> tuple[int, str]:
     """Sends a request to the direct API endpoint."""
-    direct_api_url = f"{DIRECT_API_BASE}/predict"
+    endpoint = "/predict_detailed" if detailed else "/predict"
+    direct_api_url = f"{DIRECT_API_BASE}{endpoint}"
     payload = {
         "text": text
     }
@@ -345,31 +391,38 @@ def run_load_test(api_choice: str, concurrent_requests: int, total_requests: int
         'concurrent_requests': concurrent_requests
     }
 
-def process_message(input_text, api_choice):
+def process_message(input_text, api_choice, detailed_mode):
     """
     Main function for the Gradio UI. It handles the message submission,
     sends the POST request, and waits for a result.
     """
     if api_choice == "Direct API":
         yield "Calling Direct API..."
-        status_code, response_text = _call_direct_api(input_text)
+        status_code, response_text = _call_direct_api(input_text, detailed=detailed_mode)
         if status_code == 200:
             try:
                 response_data = json.loads(response_text)
-                emotion = response_data.get("emotion")
-                confidence = response_data.get("confidence")
                 
-                if emotion is not None and confidence is not None:
-                    # Convert confidence to float if it's not already
-                    if isinstance(confidence, (int, float)):
-                        confidence_float = float(confidence)
-                    else:
-                        confidence_float = 1.0  # Default if parsing fails
-                    
-                    formatted_result = _format_emotion_response(emotion, confidence_float)
-                    yield f"Direct API Response:\n{formatted_result}"
+                if detailed_mode and "all_emotions" in response_data:
+                    # Handle detailed response
+                    formatted_result = _format_detailed_response(response_data)
+                    yield f"Direct API Response (Detailed):\n{formatted_result}"
                 else:
-                    yield f"Direct API Response: {response_text}"
+                    # Handle simple response
+                    emotion = response_data.get("emotion") or response_data.get("predicted_emotion")
+                    confidence = response_data.get("confidence")
+                    
+                    if emotion is not None and confidence is not None:
+                        # Convert confidence to float if it's not already
+                        if isinstance(confidence, (int, float)):
+                            confidence_float = float(confidence)
+                        else:
+                            confidence_float = 1.0  # Default if parsing fails
+                        
+                        formatted_result = _format_emotion_response(emotion, confidence_float)
+                        yield f"Direct API Response:\n{formatted_result}"
+                    else:
+                        yield f"Direct API Response: {response_text}"
             except json.JSONDecodeError:
                 yield f"ERROR: Direct API response was not valid JSON: {response_text}"
         else:
@@ -529,12 +582,23 @@ with gr.Blocks(title="MCP Emotion Detector") as demo:
             
             with gr.Row():
                 api_choice = gr.Radio(choices=["Supergateway (MCP)", "Direct API"], label="API Endpoint", value="Supergateway (MCP)")
+                detailed_mode = gr.Checkbox(label="Detailed Analysis (Direct API only)", value=False, info="Show all emotions with probabilities")
+            
+            # Function to enable/disable detailed mode based on API choice
+            def toggle_detailed_mode(api_choice):
+                return gr.Checkbox(interactive=(api_choice == "Direct API"))
+            
+            api_choice.change(
+                fn=toggle_detailed_mode,
+                inputs=[api_choice],
+                outputs=[detailed_mode]
+            )
             
             with gr.Row():
                 message_input = gr.Textbox(
                     label="Message to Analyze"
                 )
-                output_textbox = gr.Textbox(label="Result", interactive=False)
+                output_textbox = gr.Textbox(label="Result", interactive=False, lines=10)
             
             # Add a separate gr.Examples component
             gr.Examples(
@@ -545,10 +609,13 @@ with gr.Blocks(title="MCP Emotion Detector") as demo:
                     "I am filled with sadness.",
                     "This news has made me feel love.",
                     "I am so angry right now.",
-                    "I am scared of the dark."
+                    "I am scared of the dark.",
+                    "I'm excited but also a bit nervous about this change.",
+                    "This is absolutely terrible and I'm disgusted by it!",
+                    "I'm surprised and delighted by this wonderful news!"
                 ],
                 inputs=message_input,
-                label="Try these examples"
+                label="Try these examples (enable Detailed Analysis for richer results)"
             )
 
             with gr.Row():
@@ -556,7 +623,7 @@ with gr.Blocks(title="MCP Emotion Detector") as demo:
 
             submit_btn.click(
                 fn=process_message,
-                inputs=[message_input, api_choice],
+                inputs=[message_input, api_choice, detailed_mode],
                 outputs=output_textbox
             )
         
