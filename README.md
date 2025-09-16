@@ -208,7 +208,7 @@ You can test the **Emotion API** directly from the command line using `curl`. Th
     - Default (fast path): `/predict` → confidence fixed at `1.0` (fastest)
     - Accurate (slower): `/predict?accurate=1` → confidence is the model's real probability
 
-2.  **Detailed Emotion Analysis (Local Only)**
+2.  **Detailed Emotion Analysis **
 
     For more comprehensive emotion analysis, you can use the detailed endpoint that returns all emotions with their probabilities:
 
@@ -239,8 +239,6 @@ You can test the **Emotion API** directly from the command line using `curl`. Th
       }
     }
     ```
-
-    **Note:** The detailed endpoint is currently only available in the local Docker setup. The hosted version will be deployed on **September 16, 2025**.
 
 3.  **Using Test Files from the `tests` Directory**
 
