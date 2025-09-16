@@ -196,6 +196,18 @@ You can test the **Emotion API** directly from the command line using `curl`. Th
     {"emotion":"happy","confidence":1}
     ```
 
+    Optional: request accurate confidence (slower)
+
+    By default, `/predict` is optimized for the fastest possible response and returns `confidence = 1.0` to avoid extra model work. If you need the actual model probability for the top emotion, opt-in by passing the `accurate=1` flag. This incurs a performance penalty but returns true probabilities.
+
+    ```bash
+    curl -s -X POST 'http://localhost:8000/predict?accurate=1' \
+      -H 'Content-Type: application/json' \
+      -d '{"text":"I am so happy today!"}' | jq .
+    ```
+    - Default (fast path): `/predict` → confidence fixed at `1.0` (fastest)
+    - Accurate (slower): `/predict?accurate=1` → confidence is the model's real probability
+
 2.  **Detailed Emotion Analysis (Local Only)**
 
     For more comprehensive emotion analysis, you can use the detailed endpoint that returns all emotions with their probabilities:

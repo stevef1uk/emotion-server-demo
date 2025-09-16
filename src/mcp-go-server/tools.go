@@ -8,13 +8,15 @@ import (
 	"log"
 	"net/http"
 	"os"
+	"strings"
 	"time"
 
 	mcp "github.com/metoro-io/mcp-golang"
 )
 
 type EmotionArgs struct {
-	Text string `json:"text"`
+	Text     string `json:"text"`
+	Accurate bool   `json:"accurate,omitempty"`
 }
 
 func handleEmotionDetection(args EmotionArgs) (*mcp.ToolResponse, error) {
@@ -23,6 +25,13 @@ func handleEmotionDetection(args EmotionArgs) (*mcp.ToolResponse, error) {
 	url := os.Getenv("EMOTION_SERVICE_URL")
 	if url == "" {
 		url = "http://localhost:8000/predict"
+	}
+	if args.Accurate {
+		if strings.Contains(url, "?") {
+			url = url + "&accurate=1"
+		} else {
+			url = url + "?accurate=1"
+		}
 	}
 	resp, err := client.Post(url, "application/json", bytes.NewBuffer(payload))
 	if err != nil {
