@@ -6,6 +6,9 @@ A complete Docker Compose setup for the Emotion API service, featuring a **Gradi
 
 There is now also a Performance Tab to allow you to load test the container
 
+Emotion detection across 14 categories:
+anger 😡, confusion 😕, desire 🧚, disgust 🤢, fear 😨, guilt 😔, happiness 😊, love ❤️, neutral 😐, sadness 😢, sarcasm 🤨, shame 😳, surprise 😲
+
 ## 🎬 Demo & Additional Projects
 
 ### Live Demo
