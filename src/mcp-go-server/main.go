@@ -47,6 +47,17 @@ func main() {
 						},
 					},
 				},
+				{
+					"name":        "emotion_detection_detailed",
+					"description": "Detailed analysis with all emotion probabilities",
+					"parameters": map[string]any{
+						"type":     "object",
+						"required": []string{"text"},
+						"properties": map[string]any{
+							"text": map[string]any{"type": "string", "description": "The text to analyze for detailed emotions"},
+						},
+					},
+				},
 			},
 		}
 		b, _ := json.Marshal(map[string]any{"jsonrpc": "2.0", "id": nil, "result": resp})
@@ -55,6 +66,9 @@ func main() {
 
 	// emotion_detection
 	_ = server.RegisterTool("emotion_detection", "Analyze text to detect emotions using AI", handleEmotionDetection)
+
+	// emotion_detection_detailed
+	_ = server.RegisterTool("emotion_detection_detailed", "Detailed analysis with all emotion probabilities", handleEmotionDetectionDetailed)
 
 	// initialize
 	_ = server.RegisterTool("initialize", "Initialize MCP server", func(_ InitializeParams) (*mcp.ToolResponse, error) {

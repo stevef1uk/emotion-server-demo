@@ -28,7 +28,7 @@ done
 # Check if required files exist
 required_files=(
     "mcp-go-server/go.mod"
-    "mcp-go-server/main/main.go"
+    "mcp-go-server/main.go"
 )
 
 for file in "${required_files[@]}"; do

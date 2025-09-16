@@ -451,12 +451,13 @@ def process_message(input_text, api_choice, detailed_mode):
         # Send the 'tools/call' request with retry logic.
         message_url = f"{MCP_BASE}/message?sessionId={urllib.parse.quote_plus(session_id)}"
         print(f"3. Sending 'tools/call' request to {message_url}...", flush=True)
+        tool_name = "emotion_detection_detailed" if detailed_mode else "emotion_detection"
         payload = {
             "jsonrpc": "2.0",
             "id": 1,
             "method": "tools/call",
             "params": {
-                "name": "emotion_detection",
+                "name": tool_name,
                 "arguments": {"text": input_text},
             },
         }
@@ -480,6 +481,10 @@ def process_message(input_text, api_choice, detailed_mode):
                 if isinstance(event_data, dict) and event_data.get("id") == 1:
                     if "result" in event_data:
                         result = event_data["result"]
+                        # Some gateways may send interim events with null result; ignore and keep waiting
+                        if result is None:
+                            print("Received interim null result; waiting for final result...", flush=True)
+                            continue
                         print(f"MCP result received: {json.dumps(result, indent=2)}", flush=True)
                         if isinstance(result, dict) and "content" in result:
                             content = result["content"]
@@ -487,6 +492,10 @@ def process_message(input_text, api_choice, detailed_mode):
                                 text_content = content[0].get("text", "")
                                 print(f"MCP text content: '{text_content}'", flush=True)
                                 if text_content:
+                                    if detailed_mode:
+                                        # For detailed mode, show the full detailed text returned by the server
+                                        yield f"MCP Response (Detailed):\n{text_content}"
+                                        return
                                     # Try to parse the MCP response to extract emotion and confidence
                                     # Expected format: "Emotion: <emotion> (Confidence: <confidence>%)"
                                     try:
@@ -582,11 +591,11 @@ with gr.Blocks(title="MCP Emotion Detector") as demo:
             
             with gr.Row():
                 api_choice = gr.Radio(choices=["Supergateway (MCP)", "Direct API"], label="API Endpoint", value="Supergateway (MCP)")
-                detailed_mode = gr.Checkbox(label="Detailed Analysis (Direct API only)", value=False, info="Show all emotions with probabilities")
+                detailed_mode = gr.Checkbox(label="Detailed Analysis", value=False, info="Show all emotions with probabilities")
             
             # Function to enable/disable detailed mode based on API choice
             def toggle_detailed_mode(api_choice):
-                return gr.Checkbox(interactive=(api_choice == "Direct API"))
+                return gr.Checkbox(interactive=True)
             
             api_choice.change(
                 fn=toggle_detailed_mode,

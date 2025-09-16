@@ -40,6 +40,37 @@ def detect_emotion(text):
     except Exception as e:
         return f"Error detecting emotion: {str(e)}"
 
+def detect_emotion_detailed(text):
+    """Call the Modal emotion service for detailed analysis"""
+    try:
+        url = "https://stevef1uk--emotion-server-serve.modal.run/predict_detailed"
+        payload = {"text": text}
+        
+        response = requests.post(url, json=payload, timeout=30)
+        response.raise_for_status()
+        
+        result = response.json()
+        predicted_emotion = result.get('predicted_emotion', 'unknown')
+        confidence = result.get('confidence', 0.0)
+        all_emotions = result.get('all_emotions', {})
+        
+        # Format the detailed response
+        response_text = f"Primary Emotion: {predicted_emotion} (Confidence: {confidence:.2%})\n\n"
+        response_text += "All Emotions:\n"
+        response_text += "=" * 50 + "\n"
+        
+        # Sort emotions by probability (highest first)
+        sorted_emotions = sorted(all_emotions.items(), key=lambda x: x[1], reverse=True)
+        
+        for emotion, probability in sorted_emotions:
+            if probability >= 0.01:  # Only show emotions with meaningful probability
+                response_text += f"{emotion.title():<12} {probability:.4f}\n"
+        
+        return response_text
+        
+    except Exception as e:
+        return f"Error detecting detailed emotion: {str(e)}"
+
 class MCPEmotionServer:
     """MCP Server for emotion detection that works with MCP Inspector"""
     
@@ -54,6 +85,20 @@ class MCPEmotionServer:
                         "text": {
                             "type": "string",
                             "description": "The text to analyze for emotion"
+                        }
+                    },
+                    "required": ["text"]
+                }
+            },
+            "emotion_detection_detailed": {
+                "name": "emotion_detection_detailed",
+                "description": "Analyze text to detect emotions with detailed breakdown of all emotion probabilities",
+                "inputSchema": {
+                    "type": "object",
+                    "properties": {
+                        "text": {
+                            "type": "string",
+                            "description": "The text to analyze for detailed emotion breakdown"
                         }
                     },
                     "required": ["text"]
@@ -101,6 +146,22 @@ class MCPEmotionServer:
                 if tool_name == "emotion_detection":
                     text = arguments.get("text", "")
                     emotion_result = detect_emotion(text)
+                    response = {
+                        "jsonrpc": "2.0",
+                        "id": request_id,
+                        "result": {
+                            "content": [
+                                {
+                                    "type": "text",
+                                    "text": emotion_result
+                                }
+                            ],
+                            "isError": False
+                        }
+                    }
+                elif tool_name == "emotion_detection_detailed":
+                    text = arguments.get("text", "")
+                    emotion_result = detect_emotion_detailed(text)
                     response = {
                         "jsonrpc": "2.0",
                         "id": request_id,
@@ -212,7 +273,7 @@ def health_check():
         "status": "healthy", 
         "server": "MCP Emotion Server",
         "version": "1.0.0",
-        "tools": ["emotion_detection"]
+        "tools": ["emotion_detection", "emotion_detection_detailed"]
     }
 
 @web_app.route('/sse', methods=['GET'])
@@ -256,6 +317,29 @@ def message_endpoint():
             "error": {"code": -32603, "message": f"Internal error: {str(e)}"}
         }), 500
 
+@web_app.route('/predict-detailed', methods=['POST'])
+def predict_detailed_endpoint():
+    """Direct API endpoint for detailed emotion prediction."""
+    try:
+        data = request.get_json()
+        if not data or 'text' not in data:
+            return {"error": "No text provided"}, 400
+        
+        text = data['text']
+        detailed_result = detect_emotion_detailed(text)
+        
+        # Return the detailed result as JSON
+        return jsonify({
+            "result": detailed_result,
+            "status": "success"
+        })
+        
+    except Exception as e:
+        return jsonify({
+            "error": f"Internal error: {str(e)}",
+            "status": "error"
+        }), 500
+
 @web_app.route('/', methods=['GET'])
 def root_endpoint():
     """Root endpoint with server information"""
@@ -267,9 +351,10 @@ def root_endpoint():
             "mcp": "/mcp",
             "message": "/message", 
             "sse": "/sse",
-            "health": "/health"
+            "health": "/health",
+            "predict_detailed": "/predict-detailed"
         },
-        "tools": ["emotion_detection"]
+        "tools": ["emotion_detection", "emotion_detection_detailed"]
     }
 
 @app.function(
