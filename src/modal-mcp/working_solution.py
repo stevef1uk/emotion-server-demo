@@ -49,27 +49,12 @@ def detect_emotion_detailed(text):
         response = requests.post(url, json=payload, timeout=30)
         response.raise_for_status()
         
+        # Return the raw JSON object so callers can render as they wish
         result = response.json()
-        predicted_emotion = result.get('predicted_emotion', 'unknown')
-        confidence = result.get('confidence', 0.0)
-        all_emotions = result.get('all_emotions', {})
-        
-        # Format the detailed response
-        response_text = f"Primary Emotion: {predicted_emotion} (Confidence: {confidence:.2%})\n\n"
-        response_text += "All Emotions:\n"
-        response_text += "=" * 50 + "\n"
-        
-        # Sort emotions by probability (highest first)
-        sorted_emotions = sorted(all_emotions.items(), key=lambda x: x[1], reverse=True)
-        
-        for emotion, probability in sorted_emotions:
-            if probability >= 0.01:  # Only show emotions with meaningful probability
-                response_text += f"{emotion.title():<12} {probability:.4f}\n"
-        
-        return response_text
+        return result
         
     except Exception as e:
-        return f"Error detecting detailed emotion: {str(e)}"
+        return {"error": f"Error detecting detailed emotion: {str(e)}"}
 
 class MCPEmotionServer:
     """MCP Server for emotion detection that works with MCP Inspector"""
@@ -161,7 +146,12 @@ class MCPEmotionServer:
                     }
                 elif tool_name == "emotion_detection_detailed":
                     text = arguments.get("text", "")
-                    emotion_result = detect_emotion_detailed(text)
+                    detailed = detect_emotion_detailed(text)
+                    # If detect_emotion_detailed returns a dict, wrap as JSON text for MCP content
+                    if isinstance(detailed, dict):
+                        content_text = json.dumps(detailed)
+                    else:
+                        content_text = str(detailed)
                     response = {
                         "jsonrpc": "2.0",
                         "id": request_id,
@@ -169,7 +159,7 @@ class MCPEmotionServer:
                             "content": [
                                 {
                                     "type": "text",
-                                    "text": emotion_result
+                                    "text": content_text
                                 }
                             ],
                             "isError": False
@@ -328,11 +318,8 @@ def predict_detailed_endpoint():
         text = data['text']
         detailed_result = detect_emotion_detailed(text)
         
-        # Return the detailed result as JSON
-        return jsonify({
-            "result": detailed_result,
-            "status": "success"
-        })
+        # Return the detailed result as JSON passthrough
+        return jsonify(detailed_result)
         
     except Exception as e:
         return jsonify({
