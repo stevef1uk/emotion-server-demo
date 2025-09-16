@@ -244,11 +244,9 @@ def _format_detailed_response(response_data: dict) -> str:
     
     return result
 
-def _call_direct_api(text: str, detailed: bool = False, accurate: bool = False) -> tuple[int, str]:
+def _call_direct_api(text: str, detailed: bool = False) -> tuple[int, str]:
     """Sends a request to the direct API endpoint."""
-    endpoint = "/predict_detailed" if detailed else "/predict"
-    if not detailed and accurate:
-        endpoint = "/predict?accurate=1"
+    endpoint = "/predict_detailed" if detailed else "/predict?accurate=1"
     direct_api_url = f"{DIRECT_API_BASE}{endpoint}"
     payload = {
         "text": text
@@ -393,14 +391,17 @@ def run_load_test(api_choice: str, concurrent_requests: int, total_requests: int
         'concurrent_requests': concurrent_requests
     }
 
-def process_message(input_text, api_choice, detailed_mode, accurate_mode):
+def process_message(input_text, api_choice, detailed_mode):
     """
     Main function for the Gradio UI. It handles the message submission,
     sends the POST request, and waits for a result.
     """
     if api_choice == "Direct API":
         yield "Calling Direct API..."
-        status_code, response_text = _call_direct_api(input_text, detailed=detailed_mode, accurate=accurate_mode)
+        status_code, response_text = _call_direct_api(
+            input_text,
+            detailed=detailed_mode
+        )
         if status_code == 200:
             try:
                 response_data = json.loads(response_text)
@@ -460,7 +461,7 @@ def process_message(input_text, api_choice, detailed_mode, accurate_mode):
             "method": "tools/call",
             "params": {
                 "name": tool_name,
-                "arguments": {"text": input_text, "accurate": bool(accurate_mode)},
+                "arguments": {"text": input_text, "accurate": (not detailed_mode)},
             },
         }
         
@@ -609,7 +610,6 @@ with gr.Blocks(title="MCP Emotion Detector") as demo:
                 message_input = gr.Textbox(
                     label="Message to Analyze"
                 )
-                accurate_mode = gr.Checkbox(label="Accurate confidence", value=False, info="Use real confidence (slower)")
                 output_textbox = gr.Textbox(label="Result", interactive=False, lines=10)
             
             # Add a separate gr.Examples component
@@ -635,7 +635,7 @@ with gr.Blocks(title="MCP Emotion Detector") as demo:
 
             submit_btn.click(
                 fn=process_message,
-                inputs=[message_input, api_choice, detailed_mode, accurate_mode],
+                inputs=[message_input, api_choice, detailed_mode],
                 outputs=output_textbox
             )
         
