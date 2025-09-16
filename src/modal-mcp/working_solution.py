@@ -22,10 +22,12 @@ image = modal.Image.debian_slim(python_version="3.11").pip_install("flask", "req
     "npm install -g supergateway"
 ]).env({"PATH": "/usr/local/go/bin:${PATH}"})
 
-def detect_emotion(text):
-    """Call the Modal emotion service"""
+def detect_emotion(text, accurate: bool = False):
+    """Call the Modal emotion service. If accurate is True, append ?accurate=1 to request."""
     try:
         url = "https://stevef1uk--emotion-server-serve.modal.run/predict"
+        if accurate:
+            url += "?accurate=1"
         payload = {"text": text}
         
         response = requests.post(url, json=payload, timeout=30)
@@ -70,6 +72,10 @@ class MCPEmotionServer:
                         "text": {
                             "type": "string",
                             "description": "The text to analyze for emotion"
+                        },
+                        "accurate": {
+                            "type": "boolean",
+                            "description": "Return accurate confidence (slower). If true, adds ?accurate=1"
                         }
                     },
                     "required": ["text"]
@@ -130,7 +136,8 @@ class MCPEmotionServer:
                 
                 if tool_name == "emotion_detection":
                     text = arguments.get("text", "")
-                    emotion_result = detect_emotion(text)
+                    accurate = bool(arguments.get("accurate", False))
+                    emotion_result = detect_emotion(text, accurate=accurate)
                     response = {
                         "jsonrpc": "2.0",
                         "id": request_id,
@@ -138,7 +145,7 @@ class MCPEmotionServer:
                             "content": [
                                 {
                                     "type": "text",
-                                    "text": emotion_result
+                                    "text": json.dumps(emotion_result)
                                 }
                             ],
                             "isError": False
