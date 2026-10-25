@@ -16,9 +16,14 @@ In this pattern, both the protected model inference engine (`emotion-api`) and t
 ```
 *(Or use `kubectl create secret generic emotion-service-keys --from-file=customer_private.pem=... --from-file=token.txt=...`)*
 
-#### Step 2: Deploy the Sidecar Pod
+#### Step 2: Deploy the Sidecar Pod & Service
 ```bash
 kubectl apply -f k8s/emotion-mcp-sidecar.yaml
+```
+
+#### Step 3: Expose via Ingress (Optional / Production)
+```bash
+kubectl apply -f k8s/emotion-ingress.yaml
 ```
 
 ---
