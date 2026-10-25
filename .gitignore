@@ -1,0 +1,58 @@
+# Security: Keys, certificates, and tokens (NEVER commit to GitHub)
+*.pem
+*.key
+*.token
+token.txt
+customer_private.pem
+customer_public.pem
+vendor_private.pem
+vendor_public.pem
+keys/*.pem
+keys/*.token
+keys/*.txt
+!keys/README.md
+src/keys/*.pem
+src/keys/*.token
+src/keys/*.txt
+!src/keys/README.md
+
+# Environment and secrets
+.env
+.env.*
+!.env.example
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+env/
+venv/
+.venv/
+.pytest_cache/
+.mypy_cache/
+
+# Go binaries and test artifacts
+*.test
+*.out
+mcp-emotion-server
+bin/
+
+# Node / Web
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+dist/
+build/
+.next/
+
+# IDE and OS
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+Thumbs.db
