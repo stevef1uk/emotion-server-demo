@@ -19,6 +19,7 @@ spec:
         # Requires customer_private.pem and token.txt mounted via emotion-service-keys secret to decrypt model
         - name: emotion-api
           image: stevef1uk/emotion-service:arm64
+          imagePullPolicy: Always
           ports:
             - containerPort: 8000
               name: http-api
