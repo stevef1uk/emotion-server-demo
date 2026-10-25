@@ -1,7 +1,7 @@
 # Multi-arch MCP Emotion Server
 # Builds natively for linux/amd64 and linux/arm64 using BuildKit cross-compilation
 
-FROM --platform=$BUILDPLATFORM golang:1.24-bookworm AS builder
+FROM --platform=$BUILDPLATFORM golang:1.26.9-bookworm AS builder
 
 # TARGETOS and TARGETARCH are automatically supplied by docker buildx
 ARG TARGETOS
