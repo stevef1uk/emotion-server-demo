@@ -2,6 +2,7 @@ package main
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -11,83 +12,140 @@ import (
 	"strings"
 	"time"
 
-	mcp "github.com/metoro-io/mcp-golang"
+	"github.com/mark3labs/mcp-go/mcp"
 )
 
-type EmotionArgs struct {
-	Text     string `json:"text"`
-	Accurate bool   `json:"accurate,omitempty"`
+var httpClient = &http.Client{
+	Timeout: 30 * time.Second,
 }
 
-func handleEmotionDetection(args EmotionArgs) (*mcp.ToolResponse, error) {
-	client := &http.Client{Timeout: 30 * time.Second}
-	payload, _ := json.Marshal(map[string]string{"text": args.Text})
+// getEmotionServiceURL returns the base /predict URL from environment or default.
+func getEmotionServiceURL() string {
 	url := os.Getenv("EMOTION_SERVICE_URL")
 	if url == "" {
 		url = "http://localhost:8000/predict"
 	}
-	if args.Accurate {
-		if strings.Contains(url, "?") {
-			url = url + "&accurate=1"
-		} else {
-			url = url + "?accurate=1"
-		}
-	}
-	resp, err := client.Post(url, "application/json", bytes.NewBuffer(payload))
-	if err != nil {
-		return nil, fmt.Errorf("request error: %w", err)
-	}
-	defer resp.Body.Close()
-	b, _ := io.ReadAll(resp.Body)
-	if resp.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf("emotion api error: %s - %s", resp.Status, string(b))
-	}
-	var out map[string]any
-	if err := json.Unmarshal(b, &out); err != nil {
-		return nil, fmt.Errorf("decode error: %w", err)
-	}
-
-	// Fixed: Use "emotion" instead of "prediction"
-	emotion, _ := out["emotion"].(string)
-	conf, _ := out["confidence"].(float64)
-
-	// Simple format without emoji - let UI handle emoji mapping
-	msg := fmt.Sprintf("Emotion: %s (Confidence: %.2f%%)", emotion, conf*100)
-
-	log.Printf("emotion_detection: %s", msg)
-	return mcp.NewToolResponse(mcp.NewTextContent(msg)), nil
+	return url
 }
 
-// handleEmotionDetectionDetailed calls the detailed prediction endpoint and
-// returns the raw JSON response as text content so the UI can render it.
-func handleEmotionDetectionDetailed(args EmotionArgs) (*mcp.ToolResponse, error) {
-	client := &http.Client{Timeout: 30 * time.Second}
-	payload, _ := json.Marshal(map[string]string{"text": args.Text})
-
-	// Prefer a dedicated detailed URL if provided; otherwise derive from EMOTION_SERVICE_URL
+// getEmotionDetailedURL returns the /predict_detailed URL.
+func getEmotionDetailedURL() string {
 	detailedURL := os.Getenv("EMOTION_DETAILED_URL")
-	if detailedURL == "" {
-		base := os.Getenv("EMOTION_SERVICE_URL")
-		if base == "" {
-			base = "http://localhost:8000/predict"
-		}
-		if len(base) >= len("/predict") && base[len(base)-len("/predict"):] == "/predict" {
-			detailedURL = base + "_detailed" // results in /predict_detailed
+	if detailedURL != "" {
+		return detailedURL
+	}
+	base := getEmotionServiceURL()
+	if strings.HasSuffix(base, "/predict") {
+		return strings.TrimSuffix(base, "/predict") + "/predict_detailed"
+	}
+	return "http://localhost:8000/predict_detailed"
+}
+
+// handleEmotionDetection calls the /predict endpoint and formats the primary emotion result.
+func handleEmotionDetection(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+	args := request.GetArguments()
+	text, _ := args["text"].(string)
+	if strings.TrimSpace(text) == "" {
+		return mcp.NewToolResultError("parameter 'text' is required and must not be empty"), nil
+	}
+
+	// accurate defaults to true unless explicitly false
+	accurate := true
+	if accVal, ok := args["accurate"].(bool); ok {
+		accurate = accVal
+	}
+
+	payload, err := json.Marshal(map[string]string{"text": text})
+	if err != nil {
+		return mcp.NewToolResultError(fmt.Sprintf("failed to encode request: %v", err)), nil
+	}
+
+	url := getEmotionServiceURL()
+	if accurate {
+		if strings.Contains(url, "?") {
+			url += "&accurate=1"
 		} else {
-			detailedURL = "http://localhost:8000/predict_detailed"
+			url += "?accurate=1"
 		}
 	}
 
-	resp, err := client.Post(detailedURL, "application/json", bytes.NewBuffer(payload))
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, url, bytes.NewBuffer(payload))
 	if err != nil {
-		return nil, fmt.Errorf("request error: %w", err)
+		return mcp.NewToolResultError(fmt.Sprintf("failed to create request: %v", err)), nil
+	}
+	req.Header.Set("Content-Type", "application/json")
+
+	resp, err := httpClient.Do(req)
+	if err != nil {
+		return mcp.NewToolResultError(fmt.Sprintf("request to emotion API failed: %v", err)), nil
 	}
 	defer resp.Body.Close()
-	b, _ := io.ReadAll(resp.Body)
-	if resp.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf("emotion api error: %s - %s", resp.Status, string(b))
+
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return mcp.NewToolResultError(fmt.Sprintf("failed to read response: %v", err)), nil
 	}
 
-	// Return the raw JSON as text so the UI can present full details
-	return mcp.NewToolResponse(mcp.NewTextContent(string(b))), nil
+	if resp.StatusCode != http.StatusOK {
+		return mcp.NewToolResultError(fmt.Sprintf("emotion API error (HTTP %d): %s", resp.StatusCode, string(body))), nil
+	}
+
+	var out map[string]any
+	if err := json.Unmarshal(body, &out); err != nil {
+		return mcp.NewToolResultError(fmt.Sprintf("failed to parse emotion API response: %v", err)), nil
+	}
+
+	// Handle both "emotion" and "predicted_emotion" fields
+	emotion, _ := out["emotion"].(string)
+	if emotion == "" {
+		emotion, _ = out["predicted_emotion"].(string)
+	}
+
+	var conf float64
+	if c, ok := out["confidence"].(float64); ok {
+		conf = c
+	}
+
+	resultMsg := fmt.Sprintf("Emotion: %s (Confidence: %.2f%%)", emotion, conf*100)
+	log.Printf("[tools] emotion_detection: %s", resultMsg)
+	return mcp.NewToolResultText(resultMsg), nil
+}
+
+// handleEmotionDetectionDetailed calls the /predict_detailed endpoint and returns raw JSON.
+func handleEmotionDetectionDetailed(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+	args := request.GetArguments()
+	text, _ := args["text"].(string)
+	if strings.TrimSpace(text) == "" {
+		return mcp.NewToolResultError("parameter 'text' is required and must not be empty"), nil
+	}
+
+	payload, err := json.Marshal(map[string]string{"text": text})
+	if err != nil {
+		return mcp.NewToolResultError(fmt.Sprintf("failed to encode request: %v", err)), nil
+	}
+
+	url := getEmotionDetailedURL()
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, url, bytes.NewBuffer(payload))
+	if err != nil {
+		return mcp.NewToolResultError(fmt.Sprintf("failed to create request: %v", err)), nil
+	}
+	req.Header.Set("Content-Type", "application/json")
+
+	resp, err := httpClient.Do(req)
+	if err != nil {
+		return mcp.NewToolResultError(fmt.Sprintf("request to emotion API failed: %v", err)), nil
+	}
+	defer resp.Body.Close()
+
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return mcp.NewToolResultError(fmt.Sprintf("failed to read response: %v", err)), nil
+	}
+
+	if resp.StatusCode != http.StatusOK {
+		return mcp.NewToolResultError(fmt.Sprintf("emotion API error (HTTP %d): %s", resp.StatusCode, string(body))), nil
+	}
+
+	log.Printf("[tools] emotion_detection_detailed: processed %d bytes response", len(body))
+	return mcp.NewToolResultText(string(body)), nil
 }

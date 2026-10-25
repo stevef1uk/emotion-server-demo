@@ -1,0 +1,65 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: emotion-mcp
+  labels:
+    app: emotion-mcp
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: emotion-mcp
+  template:
+    metadata:
+      labels:
+        app: emotion-mcp
+    spec:
+      containers:
+        - name: emotion-mcp
+          image: stevef1uk/emotion-mcp:latest
+          ports:
+            - containerPort: 9000
+              name: mcp
+          env:
+            - name: MCP_HOST
+              value: "0.0.0.0"
+            - name: MCP_PORT
+              value: "9000"
+            - name: MCP_TRANSPORT
+              value: "dual"
+            - name: EMOTION_SERVICE_URL
+              value: "http://emotion-api:8000/predict"
+          resources:
+            requests:
+              cpu: "50m"
+              memory: "64Mi"
+            limits:
+              cpu: "500m"
+              memory: "256Mi"
+          readinessProbe:
+            httpGet:
+              path: /healthz
+              port: 9000
+            initialDelaySeconds: 3
+            periodSeconds: 5
+          livenessProbe:
+            httpGet:
+              path: /healthz
+              port: 9000
+            initialDelaySeconds: 10
+            periodSeconds: 10
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: emotion-mcp
+  labels:
+    app: emotion-mcp
+spec:
+  type: ClusterIP
+  selector:
+    app: emotion-mcp
+  ports:
+    - name: mcp
+      port: 9000
+      targetPort: 9000

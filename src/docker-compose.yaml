@@ -1,7 +1,8 @@
 services:
   # Main Emotion API Service (from Docker Hub)
   emotion-api:
-    image: stevef1uk/emotion-service:${IMAGE_TAG:-amd64}  # Updated line
+    image: stevef1uk/emotion-service:${IMAGE_TAG:-amd64}
+    container_name: emotion-api
     ports:
       - "8000:8000"
     environment:
@@ -11,16 +12,26 @@ services:
       - emotion_network
     restart: unless-stopped
 
-  # MCP Server
+  # MCP Server (Go-based, dual Streamable-HTTP & SSE transport)
   emotion-mcp:
     build:
       context: ./mcp-go-server
       dockerfile: Dockerfile
+    image: ${MCP_IMAGE:-stevef1uk/emotion-mcp:latest}
+    container_name: emotion-mcp
     ports:
       - "9000:9000"
     environment:
       - EMOTION_SERVICE_URL=http://emotion-api:8000/predict
-      - MCP_SERVER_PORT=9000
+      - MCP_PORT=9000
+      - MCP_TRANSPORT=dual
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9000/health"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+    depends_on:
+      - emotion-api
     networks:
       - emotion_network
     restart: unless-stopped
@@ -30,11 +41,15 @@ services:
     build:
       context: ./ui
       dockerfile: Dockerfile
+    container_name: emotion-ui
     ports:
       - "7860:7860"
     environment:
       - SG_BASE=http://emotion-mcp:9000
       - DIRECT_API_BASE=http://emotion-api:8000
+    depends_on:
+      - emotion-mcp
+      - emotion-api
     networks:
       - emotion_network
     restart: unless-stopped

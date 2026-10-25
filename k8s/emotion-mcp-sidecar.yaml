@@ -1,0 +1,101 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: emotion-service
+  labels:
+    app: emotion-service
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: emotion-service
+  template:
+    metadata:
+      labels:
+        app: emotion-service
+    spec:
+      containers:
+        # Protected Emotion Model Inference Engine
+        - name: emotion-api
+          image: stevef1uk/emotion-service:amd64 # or stevef1uk/emotion-service:arm64
+          ports:
+            - containerPort: 8000
+              name: http-api
+          env:
+            - name: GO_SERVER_PORT
+              value: "8000"
+            - name: MODEL_PATH
+              value: "/app/model"
+          resources:
+            requests:
+              cpu: "500m"
+              memory: "1Gi"
+            limits:
+              cpu: "4000m"
+              memory: "4Gi"
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: 8000
+            initialDelaySeconds: 5
+            periodSeconds: 5
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: 8000
+            initialDelaySeconds: 15
+            periodSeconds: 10
+
+        # Native Go MCP Server (Dual Streamable-HTTP & SSE)
+        - name: emotion-mcp
+          image: stevef1uk/emotion-mcp:latest
+          ports:
+            - containerPort: 9000
+              name: mcp
+          env:
+            - name: MCP_HOST
+              value: "0.0.0.0"
+            - name: MCP_PORT
+              value: "9000"
+            - name: MCP_TRANSPORT
+              value: "dual"
+            # Communicates locally over loopback to the protected model container
+            - name: EMOTION_SERVICE_URL
+              value: "http://127.0.0.1:8000/predict"
+          resources:
+            requests:
+              cpu: "50m"
+              memory: "64Mi"
+            limits:
+              cpu: "500m"
+              memory: "256Mi"
+          readinessProbe:
+            httpGet:
+              path: /healthz
+              port: 9000
+            initialDelaySeconds: 3
+            periodSeconds: 5
+          livenessProbe:
+            httpGet:
+              path: /healthz
+              port: 9000
+            initialDelaySeconds: 10
+            periodSeconds: 10
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: emotion-mcp
+  labels:
+    app: emotion-service
+spec:
+  type: ClusterIP
+  selector:
+    app: emotion-service
+  ports:
+    - name: mcp
+      port: 9000
+      targetPort: 9000
+    - name: direct-api
+      port: 8000
+      targetPort: 8000

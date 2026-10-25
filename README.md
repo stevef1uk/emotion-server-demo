@@ -47,7 +47,15 @@ The stack consists of three main services:
 
 * **Emotion API (emotion-api):** The core Go server that runs the emotion analysis model using **llama.cpp** integration. This is the source of truth for emotion predictions. It contains a fine-tuned gemma3:120 model embedded in a docker container. This component is external to this project - see the [Docker Hub repository](https://hub.docker.com/repository/docker/stevef1uk/emotion-service/general) for details and the [Business_Case.md](./Business_Case.md) file for more information.
 * **Gradio UI (emotion-ui):** A user-friendly Gradio-based web interface that allows for easy interaction with the service. It can send prediction requests directly to the **emotion-api** or via the **emotion-mcp** server.
-* **MCP Server (emotion-mcp):** A Go-based server that acts as a proxy, demonstrating the **Model Context Protocol (MCP)** approach. It routes requests from the UI to the Emotion API.
+* **MCP Server (emotion-mcp):** A high-performance, native Go-based server built with `github.com/mark3labs/mcp-go`. It supports **dual transport** (Streamable-HTTP at `/mcp` and Server-Sent Events at `/sse` + `/message`), runs multi-arch on both x86_64 and ARM64 in an ultra-lean Alpine container (~25MB), and seamlessly routes tool calls (`emotion_detection`, `emotion_detection_detailed`) to the Emotion API. Compatible with Gradio UI, Claude Desktop, Agent Gateway, and MCP Inspector.
+
+***
+
+### Kubernetes & k3s Support
+
+Production-ready Kubernetes manifests are provided under [`k8s/`](./k8s/):
+- **Sidecar Pod (`k8s/emotion-mcp-sidecar.yaml`):** Deploys both the protected model inference engine and the MCP server within a single pod communicating over localhost, preserving model security while providing a single deployable unit.
+- **Standalone MCP Deployment (`k8s/emotion-mcp-standalone.yaml`):** Deploys the MCP server independently to connect with existing API services.
 
 ***
 
@@ -63,6 +71,10 @@ The stack consists of three main services:
 The project structure includes the core emotion service stack, demo projects, and supporting files:
 ```
 ├── docker-compose.yml
+├── k8s/                               # Kubernetes & k3s manifests
+│   ├── emotion-mcp-sidecar.yaml       # Single pod sidecar deployment (recommended)
+│   ├── emotion-mcp-standalone.yaml    # Standalone MCP deployment
+│   └── README.md                      # Kubernetes deployment guide
 ├── src/
 │   ├── Demo_Agentic_Routing/          # CrewAI customer service demo
 │   │   ├── demo.py
@@ -72,8 +84,11 @@ The project structure includes the core emotion service stack, demo projects, an
 │   │   ├── src/
 │   │   ├── package.json
 │   │   └── README.md
-│   ├── mcp-go-server/                 # MCP server implementation
+│   ├── mcp-go-server/                 # Multi-arch Go MCP server (Streamable-HTTP & SSE)
 │   │   ├── main.go
+│   │   ├── tools.go
+│   │   ├── main_test.go
+│   │   ├── Dockerfile
 │   │   └── go.mod
 │   ├── modal/                         # Modal deployment files
 │   ├── tests/                         # Test files and scripts
