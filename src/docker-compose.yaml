@@ -8,6 +8,11 @@ services:
     environment:
       - MODEL_PATH=/app/model
       - GO_SERVER_PORT=8000
+      - PRIVATE_KEY_PATH=/app/keys/customer_private.pem
+      - TOKEN_FILE_PATH=/app/gemma3_emotion_model_unsloth/release/token.txt
+    volumes:
+      # Optional: commercial customers mount customer_private.pem here to decrypt model
+      - ./keys:/app/keys:ro
     networks:
       - emotion_network
     restart: unless-stopped

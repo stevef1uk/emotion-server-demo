@@ -16,6 +16,7 @@ spec:
     spec:
       containers:
         # Protected Emotion Model Inference Engine
+        # Requires customer_private.pem and token.txt mounted via emotion-service-keys secret to decrypt model
         - name: emotion-api
           image: stevef1uk/emotion-service:amd64 # or stevef1uk/emotion-service:arm64
           ports:
@@ -26,6 +27,19 @@ spec:
               value: "8000"
             - name: MODEL_PATH
               value: "/app/model"
+            - name: PRIVATE_KEY_PATH
+              value: "/app/keys/customer_private.pem"
+            - name: TOKEN_FILE_PATH
+              value: "/app/gemma3_emotion_model_unsloth/release/token.txt"
+          volumeMounts:
+            - name: emotion-keys
+              mountPath: /app/keys/customer_private.pem
+              subPath: customer_private.pem
+              readOnly: true
+            - name: emotion-keys
+              mountPath: /app/gemma3_emotion_model_unsloth/release/token.txt
+              subPath: token.txt
+              readOnly: true
           resources:
             requests:
               cpu: "500m"
@@ -81,6 +95,11 @@ spec:
               port: 9000
             initialDelaySeconds: 10
             periodSeconds: 10
+      volumes:
+        - name: emotion-keys
+          secret:
+            secretName: emotion-service-keys
+            optional: true # if not present, container entrypoint signals licensing required
 ---
 apiVersion: v1
 kind: Service

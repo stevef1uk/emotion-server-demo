@@ -10,10 +10,18 @@ In this pattern, both the protected model inference engine (`emotion-api`) and t
 - **Fast Local Communication**: The MCP server forwards inference requests to `http://127.0.0.1:8000` via loopback, eliminating network latency.
 - **Atomic Deployment**: Both components scale and deploy together as a single Kubernetes workload.
 
-To apply:
+#### Step 1: Create the Secret on k3s (with your customer private key & token)
+```bash
+./k8s/create-secret.sh /path/to/customer_private.pem /path/to/token.txt default
+```
+*(Or use `kubectl create secret generic emotion-service-keys --from-file=customer_private.pem=... --from-file=token.txt=...`)*
+
+#### Step 2: Deploy the Sidecar Pod
 ```bash
 kubectl apply -f k8s/emotion-mcp-sidecar.yaml
 ```
+
+---
 
 ### 2. Standalone MCP Server (`k8s/emotion-mcp-standalone.yaml`)
 In this pattern, `emotion-mcp` runs as an independent deployment and connects to an existing `emotion-api` service (or a cloud endpoint such as Modal) via `EMOTION_SERVICE_URL`.
@@ -22,6 +30,17 @@ To apply:
 ```bash
 kubectl apply -f k8s/emotion-mcp-standalone.yaml
 ```
+
+---
+
+## Model Decryption & Licensing Enforcement
+
+- **Public / Unlicensed Mode (Docker Compose default)**:
+  - When run locally without `customer_private.pem` mounted, the model remains locked and encrypted.
+  - The MCP server returns a friendly, actionable error informing the client that a commercial license is required and pointing them to `https://emotion-service-api.sjfisher.com`.
+- **Licensed / Managed k3s Mode**:
+  - The `emotion-service-keys` secret mounts the customer private key and token into `/app/keys/customer_private.pem` and `/app/gemma3_emotion_model_unsloth/release/token.txt`.
+  - The entrypoint unwraps the Fernet symmetric key using the private key, decrypts the GGUF model into memory, and launches inference.
 
 ---
 

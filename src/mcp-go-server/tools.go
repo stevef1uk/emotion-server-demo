@@ -41,6 +41,8 @@ func getEmotionDetailedURL() string {
 	return "http://localhost:8000/predict_detailed"
 }
 
+const commercialLicenseNotice = "Emotion Service API License Required: The emotion detection model is encrypted and protected. Running locally via Docker Compose requires a valid customer private key and license. When running from the public repository without a mounted license key, the model remains locked. To obtain access or a commercial license, please visit https://emotion-service-api.sjfisher.com or contact sales@sjfisher.com."
+
 // handleEmotionDetection calls the /predict endpoint and formats the primary emotion result.
 func handleEmotionDetection(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 	args := request.GetArguments()
@@ -77,7 +79,7 @@ func handleEmotionDetection(ctx context.Context, request mcp.CallToolRequest) (*
 
 	resp, err := httpClient.Do(req)
 	if err != nil {
-		return mcp.NewToolResultError(fmt.Sprintf("request to emotion API failed: %v", err)), nil
+		return mcp.NewToolResultError(fmt.Sprintf("%s\n\n(Backend notice: unable to reach emotion-api at %s: %v)", commercialLicenseNotice, url, err)), nil
 	}
 	defer resp.Body.Close()
 
@@ -87,7 +89,7 @@ func handleEmotionDetection(ctx context.Context, request mcp.CallToolRequest) (*
 	}
 
 	if resp.StatusCode != http.StatusOK {
-		return mcp.NewToolResultError(fmt.Sprintf("emotion API error (HTTP %d): %s", resp.StatusCode, string(body))), nil
+		return mcp.NewToolResultError(fmt.Sprintf("%s\n\n(Backend returned HTTP %d: %s)", commercialLicenseNotice, resp.StatusCode, string(body))), nil
 	}
 
 	var out map[string]any
@@ -133,7 +135,7 @@ func handleEmotionDetectionDetailed(ctx context.Context, request mcp.CallToolReq
 
 	resp, err := httpClient.Do(req)
 	if err != nil {
-		return mcp.NewToolResultError(fmt.Sprintf("request to emotion API failed: %v", err)), nil
+		return mcp.NewToolResultError(fmt.Sprintf("%s\n\n(Backend notice: unable to reach emotion-api at %s: %v)", commercialLicenseNotice, url, err)), nil
 	}
 	defer resp.Body.Close()
 
@@ -143,7 +145,7 @@ func handleEmotionDetectionDetailed(ctx context.Context, request mcp.CallToolReq
 	}
 
 	if resp.StatusCode != http.StatusOK {
-		return mcp.NewToolResultError(fmt.Sprintf("emotion API error (HTTP %d): %s", resp.StatusCode, string(body))), nil
+		return mcp.NewToolResultError(fmt.Sprintf("%s\n\n(Backend returned HTTP %d: %s)", commercialLicenseNotice, resp.StatusCode, string(body))), nil
 	}
 
 	log.Printf("[tools] emotion_detection_detailed: processed %d bytes response", len(body))
