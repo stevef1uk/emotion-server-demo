@@ -89,6 +89,13 @@ func main() {
 	)
 	mux.Handle("/mcp", httpServer)
 	mux.Handle("/mcp/", httpServer)
+	// Also accept /mcp-emotion when called directly or forwarded by gateway PEPs
+	mcpProxyHandler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		r.URL.Path = "/mcp"
+		httpServer.ServeHTTP(w, r)
+	})
+	mux.Handle("/mcp-emotion", mcpProxyHandler)
+	mux.Handle("/mcp-emotion/", mcpProxyHandler)
 
 	// SSE transport (/sse, /message) for Gradio UI and SSE clients
 	sseServer := server.NewSSEServer(mcpServer)
