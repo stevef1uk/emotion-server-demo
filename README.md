@@ -48,6 +48,7 @@ The stack consists of three main services:
 * **Emotion API (emotion-api):** The core Go server that runs the emotion analysis model using **llama.cpp** integration. This is the source of truth for emotion predictions. It contains a fine-tuned gemma3:120 model embedded in a docker container. This component is external to this project - see the [Docker Hub repository](https://hub.docker.com/repository/docker/stevef1uk/emotion-service/general) for details and the [Business_Case.md](./Business_Case.md) file for more information.
 * **Gradio UI (emotion-ui):** A user-friendly Gradio-based web interface that allows for easy interaction with the service. It can send prediction requests directly to the **emotion-api** or via the **emotion-mcp** server.
 * **MCP Server (emotion-mcp):** A high-performance, native Go-based server built with `github.com/mark3labs/mcp-go`. It supports **dual transport** (Streamable-HTTP at `/mcp` and Server-Sent Events at `/sse` + `/message`), runs multi-arch on both x86_64 and ARM64 in an ultra-lean Alpine container (~25MB), and seamlessly routes tool calls (`emotion_detection`, `emotion_detection_detailed`) to the Emotion API. Compatible with Gradio UI, Claude Desktop, Agent Gateway, and MCP Inspector.
+  - **Integration Guide for External Projects & Agents:** See [`docs/MCP_INTEGRATION_GUIDE.md`](./docs/MCP_INTEGRATION_GUIDE.md) for full endpoint specifications, JSON-RPC schemas, and configuration for Claude Desktop and agent frameworks.
 
 ***
 
@@ -56,6 +57,7 @@ The stack consists of three main services:
 Production-ready Kubernetes manifests are provided under [`k8s/`](./k8s/):
 - **Sidecar Pod (`k8s/emotion-mcp-sidecar.yaml`):** Deploys both the protected model inference engine and the MCP server within a single pod communicating over localhost, preserving model security while providing a single deployable unit.
 - **Standalone MCP Deployment (`k8s/emotion-mcp-standalone.yaml`):** Deploys the MCP server independently to connect with existing API services.
+- **k3s Deployment Guide:** Detailed setup and secret management instructions in [`k8s/README.md`](./k8s/README.md).
 
 ***
 
@@ -70,12 +72,17 @@ Production-ready Kubernetes manifests are provided under [`k8s/`](./k8s/):
 
 The project structure includes the core emotion service stack, demo projects, and supporting files:
 ```
-├── docker-compose.yml
+├── docs/
+│   └── MCP_INTEGRATION_GUIDE.md       # Integration guide for external projects and AI agents
 ├── k8s/                               # Kubernetes & k3s manifests
 │   ├── emotion-mcp-sidecar.yaml       # Single pod sidecar deployment (recommended)
 │   ├── emotion-mcp-standalone.yaml    # Standalone MCP deployment
+│   ├── create-secret.sh               # CLI script to create k3s key/token secret
 │   └── README.md                      # Kubernetes deployment guide
+├── scripts/
+│   └── package-model-for-k3s.sh       # secure_packager model packaging script
 ├── src/
+│   ├── docker-compose.yaml            # Local stack composition
 │   ├── Demo_Agentic_Routing/          # CrewAI customer service demo
 │   │   ├── demo.py
 │   │   ├── test_api.py
@@ -84,15 +91,18 @@ The project structure includes the core emotion service stack, demo projects, an
 │   │   ├── src/
 │   │   ├── package.json
 │   │   └── README.md
+│   ├── keys/                          # Local keys mount directory (gitignored)
+│   │   └── README.md
 │   ├── mcp-go-server/                 # Multi-arch Go MCP server (Streamable-HTTP & SSE)
 │   │   ├── main.go
 │   │   ├── tools.go
 │   │   ├── main_test.go
 │   │   ├── Dockerfile
-│   │   └── go.mod
+│   │   ├── go.mod
+│   │   └── README.md
 │   ├── modal/                         # Modal deployment files
 │   ├── tests/                         # Test files and scripts
-│   ├── ui/                           # Gradio UI
+│   ├── ui/                            # Gradio UI
 │   └── dev.sh
 ├── tests/
 │   ├── request_anger.json
@@ -101,7 +111,7 @@ The project structure includes the core emotion service stack, demo projects, an
 ├── token_renewal/
 │   ├── build-updated-image.sh
 │   └── Dockerfile
-├── images/                           # Project images and screenshots
+├── images/                            # Project images and screenshots
 ├── Business_Case.md
 └── README.md
 ```
@@ -418,9 +428,9 @@ This command stops and removes all containers, networks, and volumes created by 
 
 ### Troubleshooting
 
-* **Services won't start?** Use `docker-compose logs -f` to see the error messages. Also can add DEBUG=1 to docker-compose.yml or docker run
+* **Services won't start?** Use `docker-compose logs -f` to see the error messages. Also can add `DEBUG=1` to docker-compose.yml or docker run.
 * **Can't access the UI?** Make sure Docker is running and that port 7860 is not being used by another application.
-* **Model decryption fails?** Ensure that following expiry of the evaluation license a valid license is requested from the projects author (stevef1uk@gmail.com) if you wish to continue to use the docker emotion-service container.
+* **Commercial License / Model Protection Notice:** The underlying LLM model weights are encrypted using `secure_packager`. When running locally via Docker Compose from the public repository without a private key mounted, the model remains locked and the MCP server / API will return a license required notice directing users to [https://emotion-service-api.sjfisher.com](https://emotion-service-api.sjfisher.com) (`sales@sjfisher.com`). To run in licensed mode (e.g. on managed k3s or locally with customer credentials), mount `customer_private.pem` into `src/keys/` or deploy via the Kubernetes secret `emotion-service-keys` (see [`k8s/README.md`](./k8s/README.md)).
 
 If you have any further questions or issues, feel free to open an issue on the project's repository.
 
