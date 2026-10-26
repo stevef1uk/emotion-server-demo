@@ -177,6 +177,9 @@
         });
 
         if (!response.ok) {
+          if (response.status === 429) {
+            throw new Error('Rate limit reached (too many requests). Please wait a moment before trying again.');
+          }
           let errMessage = `HTTP error! status: ${response.status}`;
           try {
             const errData = await response.json();

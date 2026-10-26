@@ -19,6 +19,29 @@ spec:
 apiVersion: traefik.io/v1alpha1
 kind: Middleware
 metadata:
+  name: emotion-ratelimit
+  namespace: emotion
+spec:
+  rateLimit:
+    average: 10
+    period: 1m
+    burst: 3
+    sourceCriterion:
+      ipStrategy:
+        depth: 1
+---
+apiVersion: traefik.io/v1alpha1
+kind: Middleware
+metadata:
+  name: emotion-inflight
+  namespace: emotion
+spec:
+  inFlightReq:
+    amount: 2
+---
+apiVersion: traefik.io/v1alpha1
+kind: Middleware
+metadata:
   name: emotion-rewrite
   namespace: emotion
 spec:
@@ -40,6 +63,8 @@ spec:
       kind: Rule
       middlewares:
         - name: emotion-cors
+        - name: emotion-ratelimit
+        - name: emotion-inflight
         - name: emotion-rewrite
       services:
         - name: emotion-web
