@@ -229,7 +229,7 @@
       // Determine confidence: prefer explicit confidence/score
       let confidence = raw.confidence;
       if (confidence === undefined && raw.score !== undefined) confidence = raw.score;
-      // If still missing and we have a distribution, derive from it
+      // If still missing and distribution exists, compute score
       const distribution = raw.all_emotions || null;
       if ((confidence === undefined || confidence === null) && distribution && emotion && distribution[emotion] !== undefined) {
         confidence = distribution[emotion];

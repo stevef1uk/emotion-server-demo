@@ -84,13 +84,14 @@ func main() {
 	mux := http.NewServeMux()
 	mux.HandleFunc("GET /healthz", srv.handleHealth)
 	mux.HandleFunc("GET /api/emotion/healthz", srv.handleHealth)
+	mux.HandleFunc("GET /robots.txt", srv.handleRobots)
 	mux.HandleFunc("GET /{$}", srv.handleIndex)
 	mux.HandleFunc("/api/analyze", srv.handleAnalyze)
 	mux.HandleFunc("/api/emotion/analyze", srv.handleAnalyze)
 
 	httpServer := &http.Server{
 		Addr:         cfg.Port,
-		Handler:      mux,
+		Handler:      secureHeadersMiddleware(mux),
 		ReadTimeout:  15 * time.Second,
 		WriteTimeout: 45 * time.Second,
 	}
@@ -98,16 +99,61 @@ func main() {
 	log.Fatal(httpServer.ListenAndServe())
 }
 
+type statusResponseWriter struct {
+	http.ResponseWriter
+	status int
+}
+
+func (w *statusResponseWriter) WriteHeader(status int) {
+	w.status = status
+	if status >= 400 {
+		w.Header().Set("Cache-Control", "no-cache, no-store, must-revalidate")
+	}
+	w.ResponseWriter.WriteHeader(status)
+}
+
+func (w *statusResponseWriter) Write(b []byte) (int, error) {
+	if w.status == 0 {
+		w.status = http.StatusOK
+	}
+	return w.ResponseWriter.Write(b)
+}
+
+func secureHeadersMiddleware(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		h := w.Header()
+		h.Set("X-Content-Type-Options", "nosniff")
+		h.Set("Referrer-Policy", "no-referrer")
+		h.Set("Permissions-Policy", "camera=(), microphone=(), geolocation=()")
+		h.Set("Strict-Transport-Security", "max-age=31536000; includeSubDomains")
+		h.Set("X-Frame-Options", "DENY")
+		h.Set("Cross-Origin-Opener-Policy", "same-origin")
+		h.Set("Cross-Origin-Resource-Policy", "cross-origin")
+		h.Set("Cross-Origin-Embedder-Policy", "require-corp")
+		h.Set("Content-Security-Policy", "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data: https://github.com https://raw.githubusercontent.com https://img.youtube.com; connect-src 'self' https://preprod.agw.sjfisher.com; form-action 'self'; frame-ancestors 'none'; base-uri 'self'; object-src 'none';")
+
+		srw := &statusResponseWriter{ResponseWriter: w}
+		next.ServeHTTP(srw, r)
+	})
+}
+
 func (s *Server) handleHealth(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
+	w.Header().Set("Cache-Control", "no-cache, no-store, must-revalidate")
 	w.WriteHeader(http.StatusOK)
 	_, _ = w.Write([]byte(`{"status":"ok"}`))
 }
 
 func (s *Server) handleIndex(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
-	w.Header().Set("Cache-Control", "no-cache, no-store, must-revalidate")
+	w.Header().Set("Cache-Control", "public, max-age=600, must-revalidate")
 	_, _ = w.Write(indexHTML)
+}
+
+func (s *Server) handleRobots(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "text/plain; charset=utf-8")
+	w.Header().Set("Cache-Control", "public, max-age=86400")
+	_, _ = w.Write([]byte("User-agent: *\nAllow: /\n"))
 }
 
 type AnalyzeRequest struct {
