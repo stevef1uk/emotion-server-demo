@@ -10,6 +10,16 @@ metadata:
 spec:
   ingressClassName: traefik
   rules:
+  - host: preprod.agw.sjfisher.com
+    http:
+      paths:
+      - path: /api/emotion
+        pathType: Prefix
+        backend:
+          service:
+            name: emotion-web
+            port:
+              number: 8080
   - host: emotion-service-api.sjfisher.com
     http:
       paths:
