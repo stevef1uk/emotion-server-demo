@@ -83,8 +83,10 @@ func main() {
 
 	mux := http.NewServeMux()
 	mux.HandleFunc("GET /healthz", srv.handleHealth)
+	mux.HandleFunc("GET /api/emotion/healthz", srv.handleHealth)
 	mux.HandleFunc("GET /{$}", srv.handleIndex)
-	mux.HandleFunc("POST /api/analyze", srv.handleAnalyze)
+	mux.HandleFunc("/api/analyze", srv.handleAnalyze)
+	mux.HandleFunc("/api/emotion/analyze", srv.handleAnalyze)
 
 	httpServer := &http.Server{
 		Addr:         cfg.Port,

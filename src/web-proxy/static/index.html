@@ -145,13 +145,18 @@
     };
 
     // API endpoints
-    const API_ENDPOINT = '/api/analyze';
+    const API_ENDPOINT = (window.location.hostname === 'emotion-service-api.sjfisher.com')
+      ? 'https://preprod.agw.sjfisher.com/api/emotion/analyze'
+      : '/api/analyze';
+    const HEALTH_ENDPOINT = (window.location.hostname === 'emotion-service-api.sjfisher.com')
+      ? 'https://preprod.agw.sjfisher.com/api/emotion/healthz'
+      : '/healthz';
     let apiMode = 'standard';
 
     // Warm up API on page load
     async function warmUpAPI() {
       try {
-        await fetch('/healthz');
+        await fetch(HEALTH_ENDPOINT);
       } catch (error) {
         console.debug('API warmup check:', error);
       }
