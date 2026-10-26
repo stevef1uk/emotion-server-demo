@@ -20,6 +20,7 @@ src/keys/*.txt
 .env
 .env.*
 !.env.example
+.gastown-ignore
 
 # Python
 __pycache__/

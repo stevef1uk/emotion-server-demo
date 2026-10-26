@@ -12,13 +12,37 @@ spec:
   - host: emotion-service-api.sjfisher.com
     http:
       paths:
+      # Public Web UI fronted by the Go proxy pod
       - path: /
+        pathType: Prefix
+        backend:
+          service:
+            name: emotion-web
+            port:
+              number: 8080
+      # Direct MCP Protocol endpoints for Claude Desktop, Agent Gateway, and agents
+      - path: /mcp
         pathType: Prefix
         backend:
           service:
             name: emotion-mcp
             port:
               number: 9000
+      - path: /sse
+        pathType: Prefix
+        backend:
+          service:
+            name: emotion-mcp
+            port:
+              number: 9000
+      - path: /message
+        pathType: Prefix
+        backend:
+          service:
+            name: emotion-mcp
+            port:
+              number: 9000
+      # Direct inference API
       - path: /predict
         pathType: Prefix
         backend:

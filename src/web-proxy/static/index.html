@@ -1,0 +1,466 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Emotion Detection Service — Gemma 3 on ARM64</title>
+  <style>
+    :root {
+      --bg: #0b0f19;
+      --card-bg: rgba(22, 30, 49, 0.75);
+      --border: rgba(255, 255, 255, 0.1);
+      --text: #f3f4f6;
+      --muted: #9ca3af;
+      --accent: #6366f1;
+      --accent-hover: #4f46e5;
+      --success: #10b981;
+      --warning: #f59e0b;
+      --danger: #ef4444;
+      --radius: 12px;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
+    body {
+      background: radial-gradient(circle at top right, #1e1b4b, var(--bg));
+      color: var(--text);
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      padding: 2.5rem 1rem;
+    }
+    .container {
+      width: 100%;
+      max-width: 820px;
+      display: flex;
+      flex-direction: column;
+      gap: 1.5rem;
+    }
+    header {
+      text-align: center;
+      margin-bottom: 0.5rem;
+    }
+    header h1 {
+      font-size: 2.2rem;
+      font-weight: 800;
+      letter-spacing: -0.025em;
+      background: linear-gradient(135deg, #a5b4fc, #6366f1, #c084fc);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      margin-bottom: 0.5rem;
+    }
+    header p {
+      color: var(--muted);
+      font-size: 1rem;
+    }
+    .badge-bar {
+      display: flex;
+      justify-content: center;
+      gap: 0.5rem;
+      flex-wrap: wrap;
+      margin-top: 0.75rem;
+    }
+    .badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.35rem;
+      padding: 0.25rem 0.65rem;
+      border-radius: 9999px;
+      font-size: 0.75rem;
+      font-weight: 600;
+      background: rgba(255, 255, 255, 0.06);
+      border: 1px solid var(--border);
+      color: #d1d5db;
+    }
+    .card {
+      background: var(--card-bg);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 1.75rem;
+      backdrop-filter: blur(16px);
+      box-shadow: 0 8px 32px rgba(0, 0, 0, 0.36);
+    }
+    label {
+      display: block;
+      font-weight: 600;
+      font-size: 0.9rem;
+      margin-bottom: 0.5rem;
+      color: #e5e7eb;
+    }
+    textarea {
+      width: 100%;
+      min-height: 110px;
+      padding: 0.85rem;
+      background: rgba(11, 15, 25, 0.85);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      color: var(--text);
+      font-size: 1rem;
+      resize: vertical;
+      transition: border-color 0.2s, box-shadow 0.2s;
+    }
+    textarea:focus {
+      outline: none;
+      border-color: var(--accent);
+      box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.25);
+    }
+    .samples {
+      display: flex;
+      gap: 0.5rem;
+      flex-wrap: wrap;
+      margin-top: 0.65rem;
+    }
+    .chip {
+      background: rgba(255, 255, 255, 0.05);
+      border: 1px solid var(--border);
+      color: #cbd5e1;
+      padding: 0.3rem 0.7rem;
+      border-radius: 6px;
+      font-size: 0.8rem;
+      cursor: pointer;
+      transition: all 0.15s;
+    }
+    .chip:hover {
+      background: rgba(99, 102, 241, 0.18);
+      border-color: var(--accent);
+      color: #fff;
+    }
+    .options-bar {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-top: 1.25rem;
+      flex-wrap: wrap;
+      gap: 1rem;
+    }
+    .toggle-wrap {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.5rem;
+      cursor: pointer;
+      font-size: 0.875rem;
+      color: var(--muted);
+      user-select: none;
+    }
+    .toggle-wrap input {
+      accent-color: var(--accent);
+      width: 16px;
+      height: 16px;
+      cursor: pointer;
+    }
+    .btn {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 0.5rem;
+      background: var(--accent);
+      color: #fff;
+      font-weight: 600;
+      font-size: 0.95rem;
+      padding: 0.75rem 1.75rem;
+      border-radius: 8px;
+      border: none;
+      cursor: pointer;
+      transition: background 0.15s, transform 0.1s;
+    }
+    .btn:hover { background: var(--accent-hover); }
+    .btn:active { transform: scale(0.98); }
+    .btn:disabled { opacity: 0.5; cursor: not-allowed; }
+    
+    /* Result section */
+    .result-section {
+      display: none;
+    }
+    .primary-emotion-hero {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 1.25rem;
+      background: rgba(99, 102, 241, 0.1);
+      border: 1px solid rgba(99, 102, 241, 0.25);
+      border-radius: 10px;
+      margin-bottom: 1.25rem;
+    }
+    .emotion-badge {
+      display: flex;
+      align-items: center;
+      gap: 0.75rem;
+    }
+    .emotion-emoji {
+      font-size: 2.2rem;
+    }
+    .emotion-name {
+      font-size: 1.5rem;
+      font-weight: 700;
+      text-transform: capitalize;
+    }
+    .emotion-confidence {
+      font-size: 1.25rem;
+      font-weight: 700;
+      color: #a5b4fc;
+    }
+    
+    /* Bars */
+    .chart-container {
+      display: flex;
+      flex-direction: column;
+      gap: 0.6rem;
+      margin-top: 1rem;
+    }
+    .bar-row {
+      display: grid;
+      grid-template-columns: 120px 1fr 60px;
+      align-items: center;
+      gap: 0.75rem;
+      font-size: 0.85rem;
+    }
+    .bar-label {
+      color: #e5e7eb;
+      text-transform: capitalize;
+    }
+    .bar-track {
+      background: rgba(255, 255, 255, 0.06);
+      height: 10px;
+      border-radius: 5px;
+      overflow: hidden;
+    }
+    .bar-fill {
+      height: 100%;
+      background: linear-gradient(90deg, #6366f1, #a855f7);
+      border-radius: 5px;
+      width: 0%;
+      transition: width 0.4s ease-out;
+    }
+    .bar-val {
+      color: var(--muted);
+      text-align: right;
+      font-family: monospace;
+    }
+
+    /* Held alert */
+    .held-card {
+      border: 1px solid rgba(245, 158, 11, 0.35);
+      background: rgba(245, 158, 11, 0.08);
+      border-radius: 10px;
+      padding: 1.25rem;
+      margin-bottom: 1rem;
+    }
+    .held-title {
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+      color: var(--warning);
+      font-weight: 700;
+      font-size: 1.05rem;
+      margin-bottom: 0.4rem;
+    }
+    .held-body {
+      color: #fde68a;
+      font-size: 0.9rem;
+      line-height: 1.45;
+    }
+    .held-meta {
+      font-family: monospace;
+      font-size: 0.8rem;
+      color: var(--muted);
+      margin-top: 0.6rem;
+    }
+
+    /* Error alert */
+    .err-card {
+      border: 1px solid rgba(239, 68, 68, 0.35);
+      background: rgba(239, 68, 68, 0.08);
+      border-radius: 10px;
+      padding: 1rem;
+      color: #fca5a5;
+      font-size: 0.9rem;
+    }
+
+    footer {
+      text-align: center;
+      margin-top: 2rem;
+      font-size: 0.8rem;
+      color: var(--muted);
+    }
+    footer a { color: #a5b4fc; text-decoration: none; }
+    footer a:hover { text-decoration: underline; }
+  </style>
+</head>
+<body>
+
+<div class="container">
+  <header>
+    <h1>🎭 Emotion Detection Service</h1>
+    <p>Predict emotions across 14 categories using fine-tuned Gemma 3 on Raspberry Pi 5</p>
+    <div class="badge-bar">
+      <span class="badge">🍓 Raspberry Pi 5 Cluster</span>
+      <span class="badge">🛡️ Governed by Agent Gateway</span>
+      <span class="badge">⚡ Native MCP Server</span>
+      <span class="badge">🔒 Model Encrypted</span>
+    </div>
+  </header>
+
+  <div class="card">
+    <label for="textInput">Enter text or speech transcript to analyze:</label>
+    <textarea id="textInput" placeholder="Type something here, e.g. I am thrilled with the new performance benchmarks!"></textarea>
+    
+    <div class="samples">
+      <span class="chip" data-sample="I am thrilled with this release, outstanding work team! 😊">😊 Happiness</span>
+      <span class="chip" data-sample="This unexpected billing issue is completely unacceptable. 😡">😡 Anger</span>
+      <span class="chip" data-sample="I feel so confused and lost about what to do next. 😕">😕 Confusion</span>
+      <span class="chip" data-sample="I truly appreciate all your help and kindness today. ❤️">❤️ Love</span>
+      <span class="chip" data-sample="The flight was scheduled for 10:00 AM on Monday. 😐">😐 Neutral</span>
+    </div>
+
+    <div class="options-bar">
+      <label class="toggle-wrap">
+        <input type="checkbox" id="detailedToggle" />
+        <span>Request Detailed 14-Class Spectrum (🔒 Governed / Holds for Human Sign-off)</span>
+      </label>
+      <button class="btn" id="analyzeBtn">Analyze Emotion</button>
+    </div>
+  </div>
+
+  <div class="card result-section" id="resultCard">
+    <!-- Held Notice -->
+    <div class="held-card" id="heldBox" style="display: none;">
+      <div class="held-title">🔐 Action Held for Human Authorization</div>
+      <div class="held-body" id="heldReason">This high-privilege action requires sign-off from an authorized operator in Agent Gateway before execution.</div>
+      <div class="held-meta" id="heldMeta"></div>
+    </div>
+
+    <!-- Error Notice -->
+    <div class="err-card" id="errBox" style="display: none;"></div>
+
+    <!-- Success Outcome -->
+    <div id="successContent" style="display: none;">
+      <div class="primary-emotion-hero">
+        <div class="emotion-badge">
+          <span class="emotion-emoji" id="resEmoji">✨</span>
+          <div>
+            <div class="emotion-name" id="resName">Neutral</div>
+            <div style="font-size: 0.8rem; color: var(--muted);" id="resTool">Tool: emotion_detection (200 OK Auto-allowed)</div>
+          </div>
+        </div>
+        <div class="emotion-confidence" id="resConf">98.5%</div>
+      </div>
+
+      <!-- Probability Bars -->
+      <div id="chartWrap" style="display: none;">
+        <label>Full 14-Class Probability Spectrum:</label>
+        <div class="chart-container" id="chartBars"></div>
+      </div>
+    </div>
+  </div>
+
+  <footer>
+    <p>Powered by <b>Gemma 3</b> · Policy Enforcement Point by <a href="https://preprod.agw.sjfisher.com" target="_blank">Agent Gateway</a> · Running on k3s</p>
+  </footer>
+</div>
+
+<script>
+  const emojiMap = {
+    anger: '😡', confusion: '😕', desire: '🧚', disgust: '🤢',
+    fear: '😨', guilt: '😔', happiness: '😊', love: '❤️',
+    neutral: '😐', sadness: '😢', sarcasm: '🤨', shame: '😳', surprise: '😲'
+  };
+
+  const textInput = document.getElementById('textInput');
+  const analyzeBtn = document.getElementById('analyzeBtn');
+  const detailedToggle = document.getElementById('detailedToggle');
+  const resultCard = document.getElementById('resultCard');
+  const heldBox = document.getElementById('heldBox');
+  const heldReason = document.getElementById('heldReason');
+  const heldMeta = document.getElementById('heldMeta');
+  const errBox = document.getElementById('errBox');
+  const successContent = document.getElementById('successContent');
+  const resEmoji = document.getElementById('resEmoji');
+  const resName = document.getElementById('resName');
+  const resConf = document.getElementById('resConf');
+  const resTool = document.getElementById('resTool');
+  const chartWrap = document.getElementById('chartWrap');
+  const chartBars = document.getElementById('chartBars');
+
+  document.querySelectorAll('.chip').forEach(c => {
+    c.addEventListener('click', () => {
+      textInput.value = c.getAttribute('data-sample');
+      textInput.focus();
+    });
+  });
+
+  analyzeBtn.addEventListener('click', async () => {
+    const text = textInput.value.trim();
+    if (!text) return;
+
+    analyzeBtn.disabled = true;
+    analyzeBtn.innerText = 'Analyzing...';
+    resultCard.style.display = 'block';
+    heldBox.style.display = 'none';
+    errBox.style.display = 'none';
+    successContent.style.display = 'none';
+
+    try {
+      const resp = await fetch('/api/analyze', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          text: text,
+          detailed: detailedToggle.checked
+        })
+      });
+
+      const data = await resp.json();
+
+      if (data.status === 'approval_required') {
+        heldBox.style.display = 'block';
+        heldReason.innerText = data.reason || 'High-privilege tool execution held for operator decision.';
+        heldMeta.innerText = `Approval ID: ${data.approval_id || 'N/A'} · Status: Held (HTTP 202)`;
+        return;
+      }
+
+      if (data.status !== 'success') {
+        errBox.style.display = 'block';
+        errBox.innerText = data.error || 'Failed to analyze emotion.';
+        return;
+      }
+
+      // Success Display
+      successContent.style.display = 'block';
+      const emo = data.primary_emotion || 'neutral';
+      resEmoji.innerText = emojiMap[emo.toLowerCase()] || '🎭';
+      resName.innerText = emo;
+      resConf.innerText = (data.confidence * 100).toFixed(1) + '%';
+      resTool.innerText = `Tool: ${data.tool} (HTTP 200 OK — Allowed)`;
+
+      // Spectrum Bars
+      if (data.all_emotions && Object.keys(data.all_emotions).length > 0) {
+        chartWrap.style.display = 'block';
+        chartBars.innerHTML = '';
+        
+        const sorted = Object.entries(data.all_emotions).sort((a,b) => b[1] - a[1]);
+        sorted.forEach(([k, v]) => {
+          const row = document.createElement('div');
+          row.className = 'bar-row';
+          const pct = (v * 100).toFixed(1);
+          row.innerHTML = `
+            <span class="bar-label">${emojiMap[k.toLowerCase()] || ''} ${k}</span>
+            <div class="bar-track"><div class="bar-fill" style="width: ${Math.max(v * 100, 1)}%"></div></div>
+            <span class="bar-val">${pct}%</span>
+          `;
+          chartBars.appendChild(row);
+        });
+      } else {
+        chartWrap.style.display = 'none';
+      }
+
+    } catch (err) {
+      errBox.style.display = 'block';
+      errBox.innerText = 'Network error contacting emotion service: ' + err.message;
+    } finally {
+      analyzeBtn.disabled = false;
+      analyzeBtn.innerText = 'Analyze Emotion';
+    }
+  });
+</script>
+
+</body>
+</html>

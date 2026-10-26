@@ -1,0 +1,76 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: emotion-web
+  labels:
+    app: emotion-web
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: emotion-web
+  template:
+    metadata:
+      labels:
+        app: emotion-web
+    spec:
+      containers:
+        - name: emotion-web
+          image: stevef1uk/emotion-web:arm64
+          imagePullPolicy: Always
+          ports:
+            - containerPort: 8080
+              name: http
+          env:
+            - name: PORT
+              value: "8080"
+            - name: GATEWAY_TOKEN_URL
+              value: "https://preprod.agw.sjfisher.com/token"
+            - name: GATEWAY_MCP_URL
+              value: "https://preprod.agw.sjfisher.com/mcp-emotion"
+            - name: TOKEN_TTL
+              value: "900"
+            - name: DELEGATION_ID
+              valueFrom:
+                secretKeyRef:
+                  name: emotion-gateway-secret
+                  key: delegation-id
+            - name: AGENT_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: emotion-gateway-secret
+                  key: agent-secret
+          resources:
+            requests:
+              cpu: "20m"
+              memory: "32Mi"
+            limits:
+              cpu: "250m"
+              memory: "128Mi"
+          readinessProbe:
+            httpGet:
+              path: /healthz
+              port: 8080
+            initialDelaySeconds: 2
+            periodSeconds: 5
+          livenessProbe:
+            httpGet:
+              path: /healthz
+              port: 8080
+            initialDelaySeconds: 5
+            periodSeconds: 10
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: emotion-web
+  labels:
+    app: emotion-web
+spec:
+  type: ClusterIP
+  selector:
+    app: emotion-web
+  ports:
+    - name: http
+      port: 8080
+      targetPort: 8080

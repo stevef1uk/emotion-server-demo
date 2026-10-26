@@ -49,6 +49,35 @@ kubectl apply -f k8s/emotion-mcp-standalone.yaml
 
 ---
 
+## Public Web UI & Gateway Proxy Pod (`emotion-web`)
+
+To front the public web domain (`https://emotion-service-api.sjfisher.com/`) with an interactive UI and route calls through the Agent Gateway without exposing credentials in HTML:
+
+### 1. Build & Push the ARM64 Container
+```bash
+docker buildx build \
+  --platform linux/arm64 \
+  -t stevef1uk/emotion-web:arm64 \
+  -f src/web-proxy/Dockerfile \
+  --push \
+  src/web-proxy
+```
+
+### 2. Configure Gateway Secret (No files on disk)
+Run the helper script to securely create the Kubernetes secret:
+```bash
+./k8s/create-gateway-secret.sh
+```
+*(Enter your Agent Gateway Delegation ID and Agent Secret when prompted).*
+
+### 3. Deploy Web Pod & Updated Ingress
+```bash
+kubectl apply -f k8s/emotion-web.yaml
+kubectl apply -f k8s/emotion-ingress.yaml
+```
+
+---
+
 ## Building Multi-Architecture Container Images (x86_64 and ARM64)
 
 To build the `emotion-mcp` image for multi-arch deployment without compiling on the k3s host:
