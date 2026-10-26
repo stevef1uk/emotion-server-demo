@@ -31,7 +31,7 @@ func TestIndexEndpoint(t *testing.T) {
 	if rec.Code != http.StatusOK {
 		t.Fatalf("expected 200, got %d", rec.Code)
 	}
-	if !strings.Contains(rec.Body.String(), "Emotion Detection Service") {
+	if !strings.Contains(rec.Body.String(), "Emotion Server API") {
 		t.Fatalf("expected HTML title, got %s", rec.Body.String())
 	}
 }
